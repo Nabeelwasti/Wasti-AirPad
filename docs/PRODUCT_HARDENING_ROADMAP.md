@@ -1,8 +1,8 @@
 # Wasti AirPad — Product hardening and release acceptance
 
-**Current version:** 1.3.1 (release candidate)  
+**Current version:** 1.3.1 (integrated on main; hardware acceptance pending)  
 **Repository:** https://github.com/Nabeelwasti/Wasti-AirPad  
-**Current release baseline:** main at 329bca84; combined 1.3.1 candidate in PR #12  
+**Current release baseline:** main at 52f26b36 (PR #12 merged)  
 **Audit date:** 25 November 2026
 
 ## Executive assessment
@@ -12,7 +12,7 @@ AirPad 1.3.1 combines two independent input transports:
 1. **Bluetooth HID:** the Android phone presents itself as a standard mouse/keyboard peripheral. No desktop companion is required.
 2. **Local Wi-Fi:** an optional Python desktop companion receives a narrowly allow-listed input protocol over TLS. Android pins the host certificate and requires an eight-digit session pairing code.
 
-The 1.3.1 release-candidate branch has passed Android unit tests, debug/release lint and builds, signed APK validation, Python protocol tests, CLI smoke tests and pip-audit. The main branch remains unchanged while hardware acceptance is pending. These are software/CI results only. Bluetooth HID compatibility, Wi-Fi discovery, synthetic desktop input and sustained use still require real hardware acceptance. Do not describe the app as fully production-certified until those tests are recorded.
+The 1.3.1 release-candidate commit passed Android unit tests, debug/release lint and builds, signed APK validation, Python protocol tests, CLI smoke tests and pip-audit before PR #12 was merged into main at 52f26b36. These are software/CI results only; post-merge main CI must also be confirmed.  Bluetooth HID compatibility, Wi-Fi discovery, synthetic desktop input and sustained use still require real hardware acceptance. Do not describe the app as fully production-certified until those tests are recorded.
 
 ## Current verified capabilities
 
@@ -61,12 +61,12 @@ The 1.3.1 release-candidate branch has passed Android unit tests, debug/release 
 
 1. **No background service or unlimited recovery.** Wi-Fi heartbeat and five-attempt bounded reconnect are implemented, but reconnect stops after five failures and requires user action.
 2. **No full text-entry keyboard or on-screen keyboard layout.** Current Wi-Fi keyboard support forwards mapped HID key/shortcut events.
-4. **No media/volume key mode or presentation remote.**
-5. **No clipboard, file transfer, notification sync, screen capture, remote shell, or cloud relay.** Clipboard/file transfer and notifications require separate consent/security designs; shell and unrestricted remote command execution are intentionally excluded.
-6. **No desktop tray, background startup option, signed Windows/macOS/Linux installers, or release attestations for desktop binaries.**
-7. **No Android 17 API 37 local-network picker migration yet.** Current target is API 36; do not target API 37 until the system-mediated NSD picker is implemented and tested.
-8. **No real-device hardware certification.** CI cannot prove the Android vendor exposes Bluetooth HID Device or that each desktop input backend works.
-9. **No top-level project licence.** The repository is publicly visible but should not be marketed as open source until the owner chooses and adds a licence. Third-party licence notices do not license the project itself.
+3. **No media/volume key mode or presentation remote.**
+4. **No clipboard, file transfer, notification sync, screen capture, remote shell, or cloud relay.** Clipboard/file transfer and notifications require separate consent/security designs; shell and unrestricted remote command execution are intentionally excluded.
+5. **No desktop tray, background startup option, signed Windows/macOS/Linux installers, or release attestations for desktop binaries.**
+6. **No Android 17 API 37 local-network picker migration yet.** Current target is API 36; do not target API 37 until the system-mediated NSD picker is implemented and tested.
+7. **No real-device hardware certification.** CI cannot prove the Android vendor exposes Bluetooth HID Device or that each desktop input backend works.
+8. **No top-level project licence.** The repository is publicly visible but should not be marketed as open source until the owner chooses and adds a licence. Third-party licence notices do not license the project itself.
 
 ## Priority roadmap
 

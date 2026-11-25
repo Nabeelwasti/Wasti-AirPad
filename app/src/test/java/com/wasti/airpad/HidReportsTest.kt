@@ -42,6 +42,32 @@ class HidReportsTest {
     }
 
     @Test
+    fun bootProtocolMouseUsesTheStandardThreeByteReport() {
+        assertArrayEquals(
+            byteArrayOf(0x05, 0x7F, 0x81.toByte()),
+            HidReports.bootMouse(buttons = 0xFD, dx = 500, dy = -500)
+        )
+        assertEquals(3, HidReports.bootMouse(0, 0, 0).size)
+    }
+
+    @Test
+    fun bootAndReportProtocolIdentifiersAreDistinct() {
+        assertEquals(0, HidReports.BOOT_MOUSE_REPORT_ID)
+        assertEquals(0, HidReports.BOOT_KEYBOARD_REPORT_ID)
+        assertEquals(1, HidReports.MOUSE_REPORT_ID)
+        assertEquals(2, HidReports.KEYBOARD_REPORT_ID)
+    }
+
+    @Test
+    fun descriptorIncludesKeyboardLedOutputReport() {
+        val descriptor = HidReports.DESCRIPTOR
+        assertTrue(descriptor.containsSequence(byteArrayOf(
+            0x05, 0x08, 0x19, 0x01, 0x29, 0x05, 0x15, 0x00, 0x25, 0x01,
+            0x95.toByte(), 0x05, 0x75, 0x01, 0x91.toByte(), 0x02
+        )))
+    }
+
+    @Test
     fun keyboardReportMasksModifierAndKeyToHidByteRange() {
         val report = HidReports.keyboard(0x1FF, 0x12B)
         assertEquals(0xFF, report[0].toInt() and 0xFF)

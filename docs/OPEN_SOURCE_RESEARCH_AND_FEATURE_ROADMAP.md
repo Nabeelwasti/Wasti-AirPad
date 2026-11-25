@@ -56,6 +56,7 @@ Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 ha
 | QR pairing | Yes, one-time invitation token | Yes, QR deep link with session code and explicit confirmation |
 | Automatic discovery | Yes, multicast/broadcast and fallback scan | Yes, DNS-SD/mDNS with manual-IP fallback |
 | Host identity / trust | Persistent public-key identity and changed-key warning | Persistent pinned certificate fingerprint; no separate persistent client token yet |
+| Port conflict fallback | Yes, dynamic ports | Yes, fixed port with automatic OS-selected fallback and advertised actual port |
 | Reconnect / liveness | Yes | Not implemented yet |
 | Keyboard text entry | Yes | Physical key/shortcut events only; no text-entry panel yet |
 | Media and volume keys | Yes | Not implemented yet |

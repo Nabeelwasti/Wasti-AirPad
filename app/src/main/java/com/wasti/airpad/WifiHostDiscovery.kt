@@ -51,12 +51,14 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
                                 ?.toString(Charsets.UTF_8) ?: return
                             if (!fingerprint.matches(Regex("[0-9a-fA-F]{64}"))) return
                             val key = address + ":" + info.port
-                            hosts[key] = WifiDiscoveredHost(
-                                name = info.serviceName,
-                                address = address,
-                                port = info.port,
-                                fingerprint = fingerprint
-                            )
+                            synchronized(hosts) {
+                                hosts[key] = WifiDiscoveredHost(
+                                    name = info.serviceName,
+                                    address = address,
+                                    port = info.port,
+                                    fingerprint = fingerprint
+                                )
+                            }
                         }
                     })
                 } catch (_: Exception) {
@@ -64,7 +66,9 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo) {
-                hosts.entries.removeAll { it.value.name == serviceInfo.serviceName }
+                synchronized(hosts) {
+                    hosts.entries.removeAll { it.value.name == serviceInfo.serviceName }
+                }
             }
 
             override fun onDiscoveryStopped(serviceType: String) = Unit

@@ -80,6 +80,15 @@ def ensure_identity():
     return cert_bytes
 
 
+def is_allowed_peer_address(value):
+    """Accept only local/private peers; never serve a public-internet client."""
+    try:
+        address = ipaddress.ip_address(value.split("%", 1)[0])
+    except (ValueError, AttributeError):
+        return False
+    return address.is_private or address.is_link_local or address.is_loopback
+
+
 def local_ipv4_addresses():
     addresses = set()
     try:
@@ -343,8 +352,15 @@ def main():
     try:
         while True:
             try:
-                connection, _ = server.accept()
+                connection, peer = server.accept()
             except socket.timeout:
+                continue
+            if not is_allowed_peer_address(peer[0]):
+                try:
+                    connection.close()
+                except OSError:
+                    pass
+                print("Rejected a non-local network peer.", file=sys.stderr)
                 continue
             try:
                 connection.settimeout(8)

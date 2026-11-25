@@ -46,7 +46,7 @@ internal class WifiRemoteClient(
     private fun enqueue(action: () -> Unit) {
         if (closed) return
         try {
-            executor.execute(action)
+            executor.execute { action() }
         } catch (_: RejectedExecutionException) {
             if (!executor.isShutdown && !closed) {
                 closeSocket()
@@ -105,20 +105,30 @@ internal class WifiRemoteClient(
 
                 val context = SSLContext.getInstance("TLS")
                 context.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
-                val connectedSocket = (context.socketFactory.createSocket() as SSLSocket).apply {
-                    soTimeout = 7000
-                    connect(InetSocketAddress(resolvedAddress, port), 7000)
-                    enabledProtocols = enabledProtocols.filter {
-                        it == "TLSv1.3" || it == "TLSv1.2"
-                    }.toTypedArray()
-                    startHandshake()
+                val connectedSocket = context.socketFactory.createSocket() as SSLSocket
+                // Publish the socket before network operations so close() can
+                // interrupt connection/handshake work during Activity teardown.
+                socket = connectedSocket
+                if (closed) {
+                    closeSocket()
+                    return@enqueue
                 }
+                connectedSocket.soTimeout = 7000
+                connectedSocket.connect(InetSocketAddress(resolvedAddress, port), 7000)
+                connectedSocket.enabledProtocols = connectedSocket.enabledProtocols.filter {
+                    it == "TLSv1.3" || it == "TLSv1.2"
+                }.toTypedArray()
+                connectedSocket.startHandshake()
 
                 val input = BufferedReader(InputStreamReader(connectedSocket.inputStream, Charsets.UTF_8))
                 val output = BufferedWriter(OutputStreamWriter(connectedSocket.outputStream, Charsets.UTF_8))
                 output.write("{\"type\":\"auth\",\"code\":\"$pairingCode\"}\n")
                 output.flush()
                 val response = input.readLine()
+                if (closed) {
+                    closeSocket()
+                    return@enqueue
+                }
                 if (response != "{\"type\":\"ready\"}") {
                     connectedSocket.close()
                     throw SecurityException("The computer rejected pairing. Check the code and try again.")

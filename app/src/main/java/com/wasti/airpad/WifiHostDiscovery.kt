@@ -58,7 +58,15 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
                         }
 
                         override fun onServiceResolved(info: NsdServiceInfo) {
-                            val address = info.host?.hostAddress
+                            @Suppress("DEPRECATION")
+                            val resolvedAddresses = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                                info.hostAddresses
+                            } else {
+                                listOfNotNull(info.host)
+                            }
+                            val address = resolvedAddresses.firstOrNull {
+                                it.isSiteLocalAddress || it.isLinkLocalAddress
+                            }?.hostAddress
                             val fingerprint = info.attributes["fingerprint"]
                                 ?.toString(Charsets.UTF_8)
                             if (address != null && fingerprint != null &&

@@ -14,13 +14,15 @@ Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse an
 - Dedicated left- and right-click controls.
 - Adjustable pointer sensitivity and natural-scroll preference saved on the device.
 - Haptic touch feedback.
+- Optional local Wi-Fi control through the Wasti AirPad desktop companion, using TLS certificate pinning and an eight-digit pairing code.
 
 ## Requirements and compatibility
 
 - Android 9 (API 28) or newer.
 - Bluetooth hardware and **Bluetooth HID Device (peripheral) profile support** on the Android device.
 - A computer that supports Bluetooth HID mouse/keyboard devices.
-- Bluetooth and Android **Nearby devices** permissions enabled.
+- Bluetooth and Android **Nearby devices** permissions enabled for Bluetooth mode.
+- For Wi-Fi mode, a computer running the AirPad desktop companion and both devices on the same trusted local network.
 
 Android exposes the HID Device profile through the system Bluetooth stack, but not every phone manufacturer enables it. A successful APK build does not guarantee that a particular phone supports HID peripheral mode. If AirPad reports that HID registration is unavailable, this is a device/firmware limitation.
 
@@ -35,7 +37,20 @@ Android exposes the HID Device profile through the system Bluetooth stack, but n
 7. Use the touch surface as a trackpad. Dedicated left- and right-click buttons are also available below it.
 8. Adjust pointer sensitivity and natural scrolling; these preferences are saved locally.
 
-If connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing. Returning to AirPad after enabling Bluetooth in Android Settings triggers a fresh HID initialization attempt.
+If Bluetooth connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing. Returning to AirPad after enabling Bluetooth in Android Settings triggers a fresh HID initialization attempt.
+
+## Connect over the same Wi-Fi network
+
+Wi-Fi mode requires the desktop companion because a computer cannot receive ordinary Wi-Fi mouse/keyboard events from a phone without a host-side receiver. The companion is in [wifi-companion](wifi-companion/README.md).
+
+1. On the computer, install Python 3.10 or newer and run the companion using the steps in its README (Windows users can double-click wifi-companion/run-windows.bat).
+2. Allow it only on **Private networks** if the operating-system firewall asks.
+3. Keep the companion running. It prints the computer's local IPv4 address, port, eight-digit pairing code and certificate SHA-256 fingerprint.
+4. Connect the phone and computer to the same trusted Wi-Fi network. Guest Wi-Fi or router client isolation can block local connections.
+5. In AirPad, tap **Wi-Fi** and enter the local IP, port, pairing code and full certificate fingerprint. Tap **Connect**.
+6. The app verifies the computer's certificate before sending any input. Tap **Wi-Fi** again to disconnect; tap **Connect** to return to Bluetooth mode.
+
+Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. The current Wi-Fi implementation uses manual IP entry; automatic discovery, QR pairing, background reconnect and signed desktop installers are still under development and are not promised in this release candidate.
 
 ## Gesture reference
 
@@ -69,7 +84,7 @@ GitHub Actions validates the Gradle Wrapper, runs unit tests, Android debug/rele
 
 ## Privacy
 
-AirPad does not need an internet connection, account, analytics SDK, or server. Bluetooth permissions are used to register the HID peripheral, discover bonded hosts, and send input reports. Input is sent to the connected Bluetooth host.
+AirPad does not use an account, analytics SDK, cloud relay or telemetry. Bluetooth input is sent to the paired Bluetooth host. Wi-Fi input is sent only to the local desktop companion over TLS after certificate and pairing-code verification. The desktop companion receives mouse/keyboard events only; it does not provide shell execution, screen capture, file access or clipboard access.
 
 ## Known limitations
 
@@ -80,7 +95,10 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 
 ## Project structure
 
-- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI and Bluetooth HID lifecycle.
+- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI and Bluetooth HID lifecycle plus Wi-Fi transport routing.
+- app/src/main/java/com/wasti/airpad/WifiRemoteClient.kt — pinned TLS local-network client.
+- wifi-companion/ — Python desktop receiver, bounded input protocol, tests and setup instructions.
+- docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md — competitor research, license notes and product roadmap.
 - app/src/main/java/com/wasti/airpad/HidReports.kt — HID descriptor and report encoding.
 - app/src/main/java/com/wasti/airpad/GesturePolicy.kt — deterministic gesture classification thresholds.
 - app/src/main/AndroidManifest.xml — Bluetooth permissions and application declaration.

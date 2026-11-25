@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.wasti.airpad"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.wasti.airpad"
         minSdk = 28
-        targetSdk = 34
-        versionCode = 5
-        versionName = "1.1.3"
+        targetSdk = 36
+        versionCode = 6
+        versionName = "1.2.0"
     }
 
     compileOptions {

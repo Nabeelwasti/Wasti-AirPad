@@ -644,7 +644,7 @@ private class PadView(context: android.content.Context) : View(context) {
                         val currentDistance = pinchDistance(event)
                         val pinchDelta = currentDistance - lastPinchDistance
                         lastPinchDistance = currentDistance
-                        if (abs(pinchDelta) > abs(dy) * 0.65f && abs(pinchDelta) > 1.5f * density) {
+                        if (GesturePolicy.isPinch(pinchDelta, dy, density)) {
                             zoomAccumulator += pinchDelta
                             if (abs(zoomAccumulator) >= 18f * density) {
                                 activity.sendCtrlWheel(if (zoomAccumulator > 0f) 1 else -1)
@@ -662,7 +662,7 @@ private class PadView(context: android.content.Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                val isTap = event.eventTime - downTime < 250L && totalMotion < 24f * density
+                val isTap = GesturePolicy.isTap(event.eventTime - downTime, totalMotion, density)
                 if (dragging) {
                     activity.sendMouse(0, 0, 0, 0)
                     dragging = false
@@ -674,7 +674,7 @@ private class PadView(context: android.content.Context) : View(context) {
                         3 -> { activity.sendKey(0x08, 0x16); haptic() }
                         4 -> { activity.sendKey(0x08, 0x04); haptic() }
                     }
-                } else if (maxPointers >= 3 && max(abs(gestureX), abs(gestureY)) > 100f * density) {
+                } else if (maxPointers >= 3 && GesturePolicy.isSwipe(gestureX, gestureY, density)) {
                     val horizontal = abs(gestureX) > abs(gestureY)
                     if (maxPointers == 3) {
                         when {

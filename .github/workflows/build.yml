@@ -18,6 +18,8 @@ jobs:
     name: Test, lint and build APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      AIRPAD_SIGNING_CONFIGURED: ${{ secrets.AIRPAD_KEYSTORE_BASE64 != '' && secrets.AIRPAD_KEYSTORE_PASSWORD != '' && secrets.AIRPAD_KEY_ALIAS != '' && secrets.AIRPAD_KEY_PASSWORD != '' }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -33,16 +35,45 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      - name: Prepare private release keystore
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        env:
+          AIRPAD_KEYSTORE_BASE64: ${{ secrets.AIRPAD_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$AIRPAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/airpad-release.jks"
+          test -s "$RUNNER_TEMP/airpad-release.jks"
+
       - name: Run unit tests, Android lint and debug build
+        env:
+          AIRPAD_KEYSTORE_PATH: ${{ runner.temp }}/airpad-release.jks
+          AIRPAD_KEYSTORE_PASSWORD: ${{ secrets.AIRPAD_KEYSTORE_PASSWORD }}
+          AIRPAD_KEY_ALIAS: ${{ secrets.AIRPAD_KEY_ALIAS }}
+          AIRPAD_KEY_PASSWORD: ${{ secrets.AIRPAD_KEY_PASSWORD }}
         run: gradle --no-daemon clean testDebugUnitTest lintDebug assembleDebug assembleRelease
 
       - name: Verify APK outputs
         run: |
           test -s app/build/outputs/apk/debug/app-debug.apk
-          test -s app/build/outputs/apk/release/app-release-unsigned.apk
-          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk
+          if [[ "$AIRPAD_SIGNING_CONFIGURED" == "true" ]]; then
+            test -s app/build/outputs/apk/release/app-release.apk
+            sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk
+          else
+            test -s app/build/outputs/apk/release/app-release-unsigned.apk
+            sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk
+          fi
+
+      - name: Upload signed release APK
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirPad-release-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload unsigned release APK
+        if: env.AIRPAD_SIGNING_CONFIGURED != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: AirPad-release-unsigned

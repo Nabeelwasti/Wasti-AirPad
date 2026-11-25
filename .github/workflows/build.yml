@@ -34,10 +34,21 @@ jobs:
           gradle-version: '8.7'
 
       - name: Run unit tests, Android lint and debug build
-        run: gradle --no-daemon clean testDebugUnitTest lintDebug assembleDebug
+        run: gradle --no-daemon clean testDebugUnitTest lintDebug assembleDebug assembleRelease
 
-      - name: Verify APK output
-        run: test -s app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify APK outputs
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirPad-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

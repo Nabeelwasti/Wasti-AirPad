@@ -1,5 +1,7 @@
 package com.wasti.airpad
 
+import android.content.res.Configuration
+
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
@@ -366,6 +368,10 @@ class MainActivity : Activity() {
     private fun setStatus(message: String) {
         if (!::status.isInitialized) return
         runOnUiThread { status.text = message }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
     }
 
     override fun onDestroy() {

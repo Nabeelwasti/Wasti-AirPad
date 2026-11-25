@@ -60,9 +60,9 @@ The project uses Android Gradle Plugin 8.5.2, Kotlin 1.9.24, Gradle 8.7, and JDK
 
 Run: gradle clean testDebugUnitTest lintDebug assembleDebug
 
-The debug APK is generated at app/build/outputs/apk/debug/app-debug.apk.
+The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is generated as app/build/outputs/apk/release/app-release-unsigned.apk and is intentionally unsigned.
 
-GitHub Actions runs unit tests, Android lint, and the debug APK build on pushes to main, pull requests, and manual workflow dispatch. The downloadable workflow artifact is named **AirPad-apk**.
+GitHub Actions runs unit tests, Android lint, and both debug and unsigned release APK builds on pushes to main, pull requests, and manual workflow dispatch. The downloadable workflow artifact is named **AirPad-apk**.
 
 ## Privacy
 
@@ -77,7 +77,7 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 
 ## Project structure
 
-- app/src/main/java/com/example/airpad/MainActivity.kt — UI, Bluetooth HID lifecycle, and touch gestures.
+- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI, Bluetooth HID lifecycle, and touch gestures.
 - app/src/main/AndroidManifest.xml — Bluetooth permissions and application declaration.
 - app/build.gradle.kts — Android configuration and unit-test dependency.
 - app/src/test/ — HID report unit tests.

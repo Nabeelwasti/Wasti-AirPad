@@ -621,12 +621,7 @@ class MainActivity : Activity() {
                                             (id.toInt() == HidReports.KEYBOARD_REPORT_ID ||
                                                 (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE && id.toInt() == 0)) ->
                                             byteArrayOf(keyboardLedState.toByte())
-                                        else -> {
-                                            try {
-                                                deviceProfile.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID)
-                                            } catch (_: SecurityException) { }
-                                            return
-                                        }
+                                        else -> ByteArray(bufferSize)
                                     }
                                     try {
                                         val response = if (payload.size < bufferSize) payload.copyOf(bufferSize) else payload

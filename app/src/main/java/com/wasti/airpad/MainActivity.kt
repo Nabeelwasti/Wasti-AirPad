@@ -991,6 +991,10 @@ private class PadView(context: android.content.Context) : View(context) {
     private var gestureX = 0f
     private var gestureY = 0f
 
+    companion object {
+        private const val PALM_REJECTION_TOUCH_MAJOR = 260f
+    }
+
     init {
         isFocusable = true
         contentDescription = "AirPad touch surface. One finger moves the pointer, tap to click, two fingers scroll, and three or four fingers trigger shortcuts."
@@ -1041,6 +1045,15 @@ private class PadView(context: android.content.Context) : View(context) {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val activity = context as? MainActivity ?: return false
+        for (index in 0 until event.pointerCount) {
+            if (event.getTouchMajor(index) > PALM_REJECTION_TOUCH_MAJOR) {
+                if (dragging) activity.sendMouse(0, 0, 0, 0)
+                dragging = false
+                lastTapTime = 0L
+                resetGesture()
+                return true
+            }
+        }
         val count = event.pointerCount.coerceAtLeast(1)
         var centerX = 0f
         var centerY = 0f

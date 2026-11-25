@@ -19,8 +19,18 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
-from pynput import keyboard, mouse
 from zeroconf import ServiceInfo, Zeroconf
+
+keyboard = None
+mouse = None
+
+
+def load_input_backend():
+    global keyboard, mouse
+    if keyboard is None or mouse is None:
+        from pynput import keyboard as keyboard_module, mouse as mouse_module
+        keyboard = keyboard_module
+        mouse = mouse_module
 
 from protocol import MAX_MESSAGE_BYTES, ProtocolError, decode_message
 
@@ -112,6 +122,7 @@ def register_discovery_service(port, fingerprint):
 
 
 def key_from_hid(code):
+    load_input_backend()
     if 4 <= code <= 29:
         return keyboard.KeyCode.from_char(chr(ord("a") + code - 4))
     if 30 <= code <= 38:
@@ -138,6 +149,7 @@ def key_from_hid(code):
 
 
 def modifier_keys(mask):
+    load_input_backend()
     mapping = (
         (0x01, keyboard.Key.ctrl_l), (0x02, keyboard.Key.shift_l),
         (0x04, keyboard.Key.alt_l), (0x08, getattr(keyboard.Key, "cmd_l", keyboard.Key.ctrl_l)),
@@ -148,6 +160,7 @@ def modifier_keys(mask):
 
 
 def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
+    load_input_backend()
     kind = message["type"]
     if kind == "release":
         for button in tuple(held_buttons):
@@ -198,6 +211,7 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
 
 
 def handle_client(tls_socket, pairing_code, auth_state):
+    load_input_backend()
     held_buttons = set()
     mouse_controller = mouse.Controller()
     keyboard_controller = keyboard.Controller()

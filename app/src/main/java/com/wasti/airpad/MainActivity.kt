@@ -818,6 +818,7 @@ class MainActivity : Activity() {
         return try {
             val accepted = profile.sendReport(target, reportId, report)
             if (accepted) {
+                val recoveringFromReportFailure = reportFailureShown
                 when {
                     reportId == HidReports.MOUSE_REPORT_ID && report.size == 4 ->
                         lastMouseReport = report.copyOf()
@@ -829,10 +830,10 @@ class MainActivity : Activity() {
                         lastKeyboardReport = report.copyOf()
                 }
                 acceptedInputReports++
-                if (reportFailureShown) reportFailureShown = false
-                if (acceptedInputReports == 1) {
+                if (recoveringFromReportFailure || acceptedInputReports == 1) {
                     setStatus("Bluetooth connected. Android accepted HID input reports.")
                 }
+                reportFailureShown = false
             } else {
                 reportRejected("Android rejected HID report ${reportId} (${report.size} bytes). Reconnect the computer.")
             }

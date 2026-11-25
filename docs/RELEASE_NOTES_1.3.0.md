@@ -22,7 +22,7 @@ The companion is in wifi-companion/. It currently uses Python 3.11+, pynput, cry
 ## Security and privacy
 
 - Wi-Fi traffic uses TLS 1.2 or newer with certificate pinning and an eight-digit pairing code.
-- Pairing code is not stored on the phone.
+- The first-pairing code is not stored on the phone. After first pairing, a random 256-bit phone token is encrypted with Android Keystore; the desktop stores only its SHA-256 hash. Later connections to that computer do not require the session code.
 - The desktop companion accepts only bounded mouse, keyboard and release messages.
 - No cloud relay, telemetry, account, shell execution, screen capture, clipboard sync or file access is included.
 - Do not port-forward the companion port. Allow it only on trusted private networks.

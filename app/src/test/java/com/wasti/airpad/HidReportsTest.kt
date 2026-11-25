@@ -46,7 +46,7 @@ class HidReportsTest {
         val report = HidReports.keyboard(0x1FF, 0x12B)
         assertEquals(0xFF, report[0].toInt() and 0xFF)
         assertEquals(0x2B, report[2].toInt() and 0xFF)
-        assertArrayEquals(byteArrayOf(0, 0, 0, 0, 0, 0), report.copyOfRange(3, 8))
+        assertArrayEquals(byteArrayOf(0, 0, 0, 0, 0), report.copyOfRange(3, 8))
     }
 
     @Test

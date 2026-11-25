@@ -1,6 +1,6 @@
 # Wasti AirPad — Open-source research, product gap audit and architecture roadmap
 
-Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies.
+Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.0 is merged to main; the current follow-up branch addresses transport reliability and documentation.
 
 ## Executive direction
 
@@ -10,7 +10,7 @@ Wi-Fi requires two components:
 - Android controller: captures gestures and sends authenticated input events.
 - Desktop companion: receives events and injects native mouse/keyboard input.
 
-The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing and manual-IP fallback. It is not yet hardware-certified or ready to merge.
+The Wi-Fi implementation merged to main in AirPad 1.3.0. It uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing, automatic port fallback and manual-IP fallback. It is not yet hardware-certified.
 
 ## Current AirPad baseline
 
@@ -21,7 +21,7 @@ Already present on main after PR #1:
 - Android 16 / API 36 build configuration, Gradle wrapper, deterministic Kotlin unit tests, lint/build CI and signed APK verification.
 - Lifecycle cleanup intended to reduce stuck mouse buttons/keys.
 
-Current feature branch adds:
+AirPad 1.3.0 adds:
 - Optional Wi-Fi mode and an Android TLS client.
 - Desktop companion under wifi-companion/.
 - Certificate SHA-256 pinning and code-based authentication.
@@ -49,7 +49,7 @@ Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 ha
 
 #### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
 
-| Capability | Beckon (public reference) | AirPad 1.3.0 branch |
+| Capability | Beckon (public reference) | AirPad 1.3.0 on main |
 |---|---|---|
 | Bluetooth HID without a PC agent | Yes | Yes |
 | Wi-Fi remote input | Yes, encrypted UDP/Noise | Yes, TLS TCP with pinned host certificate |

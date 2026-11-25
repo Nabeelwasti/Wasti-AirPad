@@ -11,7 +11,7 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 - The phone stores the token encrypted with a non-exportable Android Keystore AES-GCM key. The desktop stores only its SHA-256 hash in ~/.wasti-airpad/trusted-clients.json, never the bearer token.
 - Mouse movement, left/right/middle buttons, wheel, keyboard keys and modifier shortcuts.
 - Input release on disconnect or transport failure.
-- Ten-second authenticated heartbeat and 30-second idle timeout; bounded automatic reconnect with five attempts and exponential backoff.
+- Ten-second authenticated heartbeat and 30-second idle timeout; bounded automatic reconnect with five attempts and exponential backoff; the retry budget resets only after a 60-second stable session.
 - Automatic port selection when the default port is already occupied.
 - Automatic local desktop discovery using DNS-SD/mDNS, with manual IP entry as a fallback.
 - QR pairing invitation that opens AirPad through a custom app link; the phone asks for confirmation before connecting.

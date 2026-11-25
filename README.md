@@ -61,11 +61,11 @@ Keyboard shortcuts are designed primarily for Windows hosts. Other operating sys
 
 The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17, and compiles/targets Android 16 (API 36). The minimum supported Android version remains Android 9 (API 28).
 
-Run: gradle clean testDebugUnitTest lintDebug assembleDebug
+Run: `./gradlew clean testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease` (Windows: `gradlew.bat ...`). The repository includes the official Gradle 8.13 Wrapper and verifies the distribution SHA-256 before use.
 
 The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is unsigned by default (`app/build/outputs/apk/release/app-release-unsigned.apk`). If all four protected GitHub Actions signing secrets are configured, CI instead produces and uploads `app-release.apk` as the **AirPad-release-signed** artifact.
 
-GitHub Actions runs unit tests, Android lint, and debug/release APK builds on pushes to main, pull requests, and manual workflow dispatch. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
+GitHub Actions validates the Gradle Wrapper, runs unit tests, Android debug/release lint, checks APK alignment and checksums, and builds debug/release APKs on pushes to main, pull requests, and manual workflow dispatch. A separate protected signing job validates the JKS private-key alias, signs the release APK, verifies APK Signature Scheme v2 and certificate identity, and uploads the signed artifact. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
 
 ## Privacy
 

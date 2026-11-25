@@ -282,8 +282,8 @@ def main():
     parser = argparse.ArgumentParser(description="Wasti AirPad local Wi-Fi desktop companion")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args()
-    if not 1 <= args.port <= 65535:
-        parser.error("--port must be between 1 and 65535")
+    if not 0 <= args.port <= 65535:
+        parser.error("--port must be 0 (automatic) or between 1 and 65535")
 
     cert_bytes = ensure_identity()
     fingerprint = hashlib.sha256(
@@ -297,7 +297,14 @@ def main():
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(("0.0.0.0", args.port))
+    try:
+        server.bind(("0.0.0.0", args.port))
+    except OSError:
+        if args.port == 0:
+            raise
+        print(f"Port {args.port} is unavailable; selecting a free local port.")
+        server.bind(("0.0.0.0", 0))
+    args.port = server.getsockname()[1]
     server.listen(4)
     server.settimeout(1.0)
 

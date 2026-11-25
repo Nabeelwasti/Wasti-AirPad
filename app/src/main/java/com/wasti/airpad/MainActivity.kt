@@ -315,8 +315,11 @@ class MainActivity : Activity() {
                                         }
                                         BluetoothProfile.STATE_CONNECTING ->
                                             setStatus("Connecting to ${safeDeviceName(device)}…")
-                                        BluetoothProfile.STATE_DISCONNECTING ->
+                                        BluetoothProfile.STATE_DISCONNECTING -> {
+                                            pad.releaseLocalState()
+                                            if (host?.address == device.address) host = null
                                             setStatus("Disconnecting from ${safeDeviceName(device)}…")
+                                        }
                                         BluetoothProfile.STATE_DISCONNECTED -> {
                                             if (host?.address == device.address) host = null
                                             setStatus("Not connected")
@@ -493,6 +496,11 @@ class MainActivity : Activity() {
 
     internal fun sendMouse(buttons: Int, dx: Int, dy: Int, wheel: Int) {
         send(HidReports.MOUSE_REPORT_ID, HidReports.mouse(buttons, dx, dy, wheel))
+    }
+
+    internal fun releaseAllInput() {
+        sendMouse(0, 0, 0, 0)
+        send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
     }
 
     internal fun sendKey(modifiers: Int, keyCode: Int) {
@@ -772,7 +780,9 @@ private class PadView(context: android.content.Context) : View(context) {
     }
 
     fun releaseLocalState() {
-        if (dragging) (context as? MainActivity)?.sendMouse(0, 0, 0, 0)
+        // Send neutral reports even if the local gesture flag was already cleared:
+        // a previous release report may have been rejected by the Bluetooth stack.
+        (context as? MainActivity)?.releaseAllInput()
         dragging = false
         lastTapTime = 0L
         resetGesture()

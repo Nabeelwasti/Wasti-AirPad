@@ -49,6 +49,8 @@ class MainActivity : Activity() {
     private var reportFailureShown = false
     private var hidProtocolMode: Byte = HidReports.PROTOCOL_REPORT_MODE
     private var keyboardLedState = 0
+    private var lastMouseReport = HidReports.mouse(0, 0, 0, 0)
+    private var lastKeyboardReport = HidReports.EMPTY_KEYBOARD.copyOf()
     private var acceptedInputReports = 0
     private var rejectedInputReports = 0
     private var pendingPermissionAction: (() -> Unit)? = null
@@ -597,19 +599,20 @@ class MainActivity : Activity() {
                                         type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
                                             hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE &&
                                             id.toInt() == 0 && bufferSize <= 3 ->
-                                            HidReports.bootMouse(0, 0, 0)
+                                            lastMouseReport.copyOf(3)
                                         type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
                                             hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE &&
                                             id.toInt() == 0 ->
-                                            HidReports.EMPTY_KEYBOARD
+                                            lastKeyboardReport.copyOf(8)
                                         type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
                                             id.toInt() == HidReports.MOUSE_REPORT_ID ->
-                                            HidReports.mouse(0, 0, 0, 0)
+                                            lastMouseReport.copyOf(4)
                                         type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
                                             id.toInt() == HidReports.KEYBOARD_REPORT_ID ->
-                                            HidReports.EMPTY_KEYBOARD
+                                            lastKeyboardReport.copyOf(8)
                                         type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
-                                            id.toInt() == HidReports.KEYBOARD_REPORT_ID ->
+                                            (id.toInt() == HidReports.KEYBOARD_REPORT_ID ||
+                                                (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE && id.toInt() == 0)) ->
                                             byteArrayOf(keyboardLedState.toByte())
                                         else -> {
                                             try {
@@ -636,7 +639,8 @@ class MainActivity : Activity() {
                                 ) {
                                     if (destroyed || host?.address != device.address) return
                                     if (type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
-                                        id.toInt() == HidReports.KEYBOARD_REPORT_ID &&
+                                        (id.toInt() == HidReports.KEYBOARD_REPORT_ID ||
+                                            (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE && id.toInt() == 0)) &&
                                         data.size == 1
                                     ) {
                                         keyboardLedState = data[0].toInt() and 0x1F
@@ -805,6 +809,16 @@ class MainActivity : Activity() {
         return try {
             val accepted = profile.sendReport(target, reportId, report)
             if (accepted) {
+                when {
+                    reportId == HidReports.MOUSE_REPORT_ID && report.size == 4 ->
+                        lastMouseReport = report.copyOf()
+                    reportId == HidReports.KEYBOARD_REPORT_ID && report.size == 8 ->
+                        lastKeyboardReport = report.copyOf()
+                    reportId == HidReports.BOOT_MOUSE_REPORT_ID && report.size == 3 ->
+                        lastMouseReport = report.copyOf()
+                    reportId == HidReports.BOOT_KEYBOARD_REPORT_ID && report.size == 8 ->
+                        lastKeyboardReport = report.copyOf()
+                }
                 acceptedInputReports++
                 if (reportFailureShown) reportFailureShown = false
                 if (acceptedInputReports == 1) {

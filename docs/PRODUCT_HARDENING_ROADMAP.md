@@ -7,7 +7,7 @@
 
 ## Executive assessment
 
-The upgrade branch now contains a coordinated Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, deterministic unit tests, persisted basic preferences, click controls, and optional protected release signing. The latest upgrade CI is still being validated; the previous run failed Android Lint on an API-level guard, which has been corrected. This is an engineering hardening milestone, not a claim of production-proven behavior: physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
+The upgrade branch now contains a coordinated Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, deterministic unit tests, persisted basic preferences, click controls, and optional protected release signing. The latest recorded upgrade CI run (45621425743) reached the release-signing preparation step and failed because `AIRPAD_KEYSTORE_BASE64` contained invalid Base64 input. The Android test/lint/build steps were skipped in that run because signing preparation and app verification shared one job. The workflow has since been split into independent verification and signing jobs, with strict Base64/JKS validation and clearer recovery diagnostics. A fresh CI run is still required to verify these changes. This is an engineering hardening milestone, not a claim of production-proven behavior: physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
@@ -20,8 +20,8 @@ This roadmap deliberately separates verified facts from work that requires physi
 - Activity teardown and HID registration failure paths have defensive cleanup guards. This does not replace device-level lifecycle testing.
 - Unit tests cover report encoding/bounds/descriptor markers and tap/pinch/swipe policy thresholds. Full MotionEvent state-machine, UI, and Android instrumentation coverage is still outstanding.
 - Pointer sensitivity and natural scrolling are persisted with SharedPreferences; DataStore migration is not implemented.
-- CI runs unit tests, Android Lint, debug and release builds, APK output checks, and artifact uploads. Release signing is optional and reads only protected Actions secrets; absent secrets produce an unsigned release artifact.
-- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1).
+- CI runs unit tests, Android Lint, debug and unsigned release builds in an independent verification job. A separate signing job validates protected Actions secrets, JKS format, store password and alias before building and uploading the signed release. Malformed signing secrets fail only the signing job and no longer prevent the automated app checks from running; absent secrets leave the unsigned artifacts available.
+- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1). The most recent recorded run, [45621425743](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45621425743), failed during keystore Base64 decoding before app checks began.
 - There is no INTERNET permission and no analytics/network SDK in the inspected manifest/dependency list.
 
 ## Findings and risks
@@ -121,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Signing workflow configured; blocked until owner provisions secrets and a signed run is verified |
+| Signed production release | Signing workflow configured; latest run exposed malformed Base64 secret; signed artifact not yet verified |
 
 ## Non-goals unless separately approved
 

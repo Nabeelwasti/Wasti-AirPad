@@ -595,7 +595,13 @@ class MainActivity : Activity() {
                                     id: Byte,
                                     bufferSize: Int
                                 ) {
-                                    if (destroyed || host?.address != device.address || bufferSize < 0) return
+                                    if (destroyed || host?.address != device.address) return
+                                    if (bufferSize !in 0..64) {
+                                        try {
+                                            deviceProfile.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_PARAM)
+                                        } catch (_: SecurityException) { }
+                                        return
+                                    }
                                     val payload = when {
                                         type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
                                             hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE &&
@@ -624,7 +630,9 @@ class MainActivity : Activity() {
                                     }
                                     try {
                                         val response = if (payload.size < bufferSize) payload.copyOf(bufferSize) else payload
-                                        deviceProfile.replyReport(device, type, id, response)
+                                        if (!deviceProfile.replyReport(device, type, id, response)) {
+                                            setStatus("Android could not queue the requested HID report response.")
+                                        }
                                     } catch (_: SecurityException) {
                                         setStatus("Android denied a Bluetooth HID report response.")
                                     } catch (_: RuntimeException) {

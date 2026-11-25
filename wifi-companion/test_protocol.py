@@ -44,6 +44,11 @@ class ProtocolTests(unittest.TestCase):
         ))
         self.assertEqual(state["failures"], 0)
 
+    def test_non_ascii_pairing_code_is_rejected_without_crashing(self):
+        state = {"failures": 0, "locked_until": 0.0}
+        self.assertFalse(check_pairing_code("１２３４５６７８", "12345678", state, now=1.0))
+        self.assertEqual(state["failures"], 1)
+
     def test_qr_pairing_uri_contains_required_values(self):
         uri = build_pairing_uri("192.168.1.20", 47777, "12345678", "a" * 64)
         parsed = urlparse(uri)

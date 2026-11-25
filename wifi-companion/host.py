@@ -34,7 +34,7 @@ def load_input_backend():
         keyboard = keyboard_module
         mouse = mouse_module
 
-from protocol import MAX_MESSAGE_BYTES, ProtocolError, decode_message
+from protocol import MAX_MESSAGE_BYTES, ProtocolError, check_pairing_code, decode_message
 
 APP_DIR = Path.home() / ".wasti-airpad"
 CERT_FILE = APP_DIR / "host-cert.pem"
@@ -123,13 +123,17 @@ def register_discovery_service(port, fingerprint):
     return discovery, service
 
 
-def print_pairing_qr(address, port, pairing_code, fingerprint):
-    payload = "wastiairpad://pair?" + urlencode({
+def build_pairing_uri(address, port, pairing_code, fingerprint):
+    return "wastiairpad://pair?" + urlencode({
         "host": address,
         "port": str(port),
         "code": pairing_code,
         "fp": fingerprint,
     })
+
+
+def print_pairing_qr(address, port, pairing_code, fingerprint):
+    payload = build_pairing_uri(address, port, pairing_code, fingerprint)
     qr = qrcode.QRCode(
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_M,
@@ -251,14 +255,10 @@ def handle_client(tls_socket, pairing_code, auth_state):
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return
             supplied = request.get("code", "") if isinstance(request, dict) and request.get("type") == "auth" else ""
-            if hmac.compare_digest(str(supplied), pairing_code):
+            if check_pairing_code(str(supplied), pairing_code, auth_state):
                 authenticated = True
-                auth_state["failures"] = 0
                 break
-            auth_state["failures"] += 1
-            if auth_state["failures"] >= 5:
-                auth_state["failures"] = 0
-                auth_state["locked_until"] = time.monotonic() + 60
+            if time.monotonic() < auth_state["locked_until"]:
                 break
             stream.write(b'{"type":"denied"}\n')
             stream.flush()

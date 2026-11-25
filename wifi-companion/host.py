@@ -267,6 +267,17 @@ def main():
     server.listen(4)
     server.settimeout(1.0)
 
+    zeroconf = None
+    service_info = None
+    try:
+        zeroconf, service_info = register_discovery_service(args.port, fingerprint)
+        if zeroconf:
+            print("Automatic discovery: enabled (DNS-SD/mDNS)")
+        else:
+            print("Automatic discovery unavailable; use the printed IP address.")
+    except Exception as error:
+        print(f"Automatic discovery unavailable: {error}")
+
     print("\nWasti AirPad Wi-Fi Companion")
     print("=" * 36)
     print(f"Computer: {socket.gethostname()}")

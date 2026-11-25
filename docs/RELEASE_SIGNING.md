@@ -58,7 +58,7 @@ Do not put these values in repository variables, source files, workflow YAML, pu
 
 ## 4. Verify the signed build
 
-The repository includes the official Gradle 8.13 Wrapper. Its distribution URL is HTTPS-pinned and `distributionSha256Sum` is set to Gradle's published SHA-256 for the 8.13 binary distribution. CI's Gradle setup action also validates the Wrapper JAR. Use `./gradlew` (or `gradlew.bat` on Windows) for local builds. The Gradle release signing configuration explicitly declares `storeType = "JKS"` to match the keystore format generated above. After all four secrets are saved, trigger a new workflow run (for example, by pushing a commit to the pull-request branch). That run should upload:
+The repository includes the official Gradle 8.13 Wrapper. Its distribution URL is HTTPS-pinned and `distributionSha256Sum` is set to Gradle's published SHA-256 for the 8.13 binary distribution. CI's Gradle setup action also validates the Wrapper JAR. Use `./gradlew` (or `gradlew.bat` on Windows) for local builds. The repository includes the official Gradle 8.13 Wrapper. Its distribution URL is HTTPS-pinned and `distributionSha256Sum` is set to Gradle's published SHA-256 for the 8.13 binary distribution. CI's Gradle setup action also validates the Wrapper JAR. Use `./gradlew` (or `gradlew.bat` on Windows) for local builds. The Gradle release signing configuration explicitly declares `storeType = "JKS"` to match the keystore format generated above. After all four secrets are saved, trigger a new workflow run (for example, by pushing a commit to the pull-request branch). That run should upload:
 
 - `AirPad-apk` — debug APK for device testing.
 - `AirPad-release-signed` — signed release APK for distribution.

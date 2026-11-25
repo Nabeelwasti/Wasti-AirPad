@@ -1,11 +1,14 @@
+import hashlib
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 import host
 from host import build_pairing_uri, is_allowed_peer_address
-from protocol import ProtocolError, check_pairing_code, decode_message
+from protocol import ProtocolError, check_pairing_code, check_trusted_client_token, decode_message
 
 
 class ProtocolTests(unittest.TestCase):
@@ -46,6 +49,32 @@ class ProtocolTests(unittest.TestCase):
             "12345678", "12345678", state, now=state["locked_until"] + 0.1
         ))
         self.assertEqual(state["failures"], 0)
+
+    def test_trusted_client_token_authentication_and_lockout(self):
+        token = "A" * 43
+        digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+        state = {"failures": 0, "locked_until": 0.0}
+        self.assertTrue(check_trusted_client_token(token, {digest}, state, now=1.0))
+        self.assertEqual(state["failures"], 0)
+        self.assertFalse(check_trusted_client_token("bad-token", {digest}, state, now=2.0))
+        self.assertEqual(state["failures"], 1)
+
+    def test_trusted_client_store_persists_hashes_not_bearer_tokens(self):
+        token = "B" * 43
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            store_file = directory / "trusted-clients.json"
+            with patch.object(host, "APP_DIR", directory), patch.object(
+                host, "TRUSTED_CLIENTS_FILE", store_file
+            ):
+                trusted = set()
+                host.save_trusted_client_token(token, trusted)
+                digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+                self.assertEqual(trusted, {digest})
+                self.assertEqual(host.load_trusted_client_hashes(), {digest})
+                self.assertNotIn(token, store_file.read_text(encoding="utf-8"))
+                host.forget_all_trusted_clients()
+                self.assertFalse(store_file.exists())
 
     def test_pairing_rejects_malformed_code_and_expected_value(self):
         state = {"failures": 0, "locked_until": 0.0}

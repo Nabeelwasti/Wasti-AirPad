@@ -239,11 +239,15 @@ internal class WifiRemoteClient(
 
     private fun startHeartbeat(connectedSocket: SSLSocket) {
         heartbeatTask?.cancel(false)
-        heartbeatTask = scheduler.scheduleWithFixedDelay({
-            if (!closed && socket === connectedSocket && isConnected) {
-                sendLine("{\"type\":\"ping\"}")
-            }
-        }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS)
+        try {
+            heartbeatTask = scheduler.scheduleWithFixedDelay({
+                if (!closed && socket === connectedSocket && isConnected) {
+                    sendLine("{\"type\":\"ping\"}")
+                }
+            }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS)
+        } catch (_: RejectedExecutionException) {
+            if (!closed) connectionLost(connectedSocket, "Wi-Fi heartbeat scheduler stopped.")
+        }
     }
 
     private fun startMonitor(connectedSocket: SSLSocket, input: BufferedReader) {
@@ -313,9 +317,13 @@ internal class WifiRemoteClient(
         val delaySeconds = 1L shl (attempt - 1)
         onState("$reason Reconnecting in $delaySeconds seconds ($attempt/$MAX_RECONNECT_ATTEMPTS).", false)
         reconnectTask?.cancel(false)
-        reconnectTask = scheduler.schedule({
-            if (!closed) enqueue { connectInternal(config, reconnecting = true) }
-        }, delaySeconds, TimeUnit.SECONDS)
+        try {
+            reconnectTask = scheduler.schedule({
+                if (!closed) enqueue { connectInternal(config, reconnecting = true) }
+            }, delaySeconds, TimeUnit.SECONDS)
+        } catch (_: RejectedExecutionException) {
+            if (!closed) onState("Automatic reconnect could not be scheduled. Tap Wi-Fi to try again.", false)
+        }
     }
 
     fun sendMouse(buttons: Int, dx: Int, dy: Int, wheel: Int) {

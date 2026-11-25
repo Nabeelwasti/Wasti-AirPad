@@ -15,7 +15,7 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 
 ## Start on Windows
 
-1. Install Python 3.10 or newer from https://www.python.org/downloads/ and enable the Python launcher.
+1. Install Python 3.11 or newer from https://www.python.org/downloads/ and enable the Python launcher.
 2. Extract or clone this repository.
 3. Double-click run-windows.bat. The first run installs the two free Python dependencies.
 4. If Windows Firewall asks, allow AirPad on Private networks only.

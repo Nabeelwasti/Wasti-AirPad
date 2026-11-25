@@ -134,12 +134,30 @@ jobs:
           AIRPAD_KEY_PASSWORD: ${{ secrets.AIRPAD_KEY_PASSWORD }}
         run: gradle --no-daemon --no-configuration-cache assembleRelease
 
-      - name: Verify signed APK and checksum
+      - name: Verify signed APK certificate and checksum
         if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        env:
+          AIRPAD_KEYSTORE_PASSWORD: ${{ secrets.AIRPAD_KEYSTORE_PASSWORD }}
+          AIRPAD_KEY_ALIAS: ${{ secrets.AIRPAD_KEY_ALIAS }}
         run: |
-          test -s app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify app/build/outputs/apk/release/app-release.apk
-          sha256sum app/build/outputs/apk/release/app-release.apk
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          apksigner="$(find "$sdk_root/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          if [[ -z "$apksigner" ]]; then
+            echo "::error::Android SDK apksigner was not found."
+            exit 1
+          fi
+          "$apksigner" verify --verbose --print-certs "$apk" | tee "$RUNNER_TEMP/apksigner-verify.txt"
+          grep -Eq 'Verified using v2 scheme .*: true' "$RUNNER_TEMP/apksigner-verify.txt"
+          expected_cert_sha="$(keytool -exportcert -keystore "$RUNNER_TEMP/airpad-release.jks" -storetype JKS -storepass "$AIRPAD_KEYSTORE_PASSWORD" -alias "$AIRPAD_KEY_ALIAS" -rfc | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':')"
+          actual_cert_sha="$(grep -m1 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/apksigner-verify.txt" | awk -F': ' '{print $2}' | tr -d ':')"
+          if [[ -z "$actual_cert_sha" || "${actual_cert_sha,,}" != "${expected_cert_sha,,}" ]]; then
+            echo "::error::The APK signer certificate does not match the configured private keystore alias."
+            exit 1
+          fi
+          sha256sum "$apk"
 
       - name: Upload signed release APK
         if: env.AIRPAD_SIGNING_CONFIGURED == 'true'

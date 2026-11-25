@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs, urlparse
 
-from host import build_pairing_uri
+from host import build_pairing_uri, is_allowed_peer_address
 from protocol import ProtocolError, check_pairing_code, decode_message
 
 
@@ -64,6 +64,14 @@ class ProtocolTests(unittest.TestCase):
         state = {"failures": 0, "locked_until": 0.0}
         self.assertFalse(check_pairing_code("１２３４５６７８", "12345678", state, now=1.0))
         self.assertEqual(state["failures"], 1)
+
+    def test_companion_accepts_only_local_peer_addresses(self):
+        self.assertTrue(is_allowed_peer_address("192.168.1.25"))
+        self.assertTrue(is_allowed_peer_address("10.0.0.8"))
+        self.assertTrue(is_allowed_peer_address("127.0.0.1"))
+        self.assertFalse(is_allowed_peer_address("8.8.8.8"))
+        self.assertFalse(is_allowed_peer_address("203.0.113.10"))
+        self.assertFalse(is_allowed_peer_address("not-an-ip"))
 
     def test_qr_pairing_uri_contains_required_values(self):
         uri = build_pairing_uri("192.168.1.20", 47777, "12345678", "a" * 64)

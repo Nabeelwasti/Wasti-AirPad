@@ -4,6 +4,7 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.Closeable
 import java.io.InputStreamReader
+import java.io.IOException
 import java.io.OutputStreamWriter
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -35,9 +36,27 @@ internal class WifiRemoteClient(
     @Volatile private var writer: BufferedWriter? = null
     @Volatile var isConnected: Boolean = false
         private set
+    @Volatile private var closed = false
+
+    /**
+     * Gesture callbacks can arrive on the UI thread at high frequency. Never let
+     * executor saturation escape into Android input dispatch: close the transport
+     * so the desktop's EOF handler releases any held mouse buttons.
+     */
+    private fun enqueue(action: () -> Unit) {
+        if (closed) return
+        try {
+            executor.execute(action)
+        } catch (_: RejectedExecutionException) {
+            if (!executor.isShutdown && !closed) {
+                closeSocket()
+                onState("Wi-Fi input queue is full. The connection was safely closed; reconnect to continue.", false)
+            }
+        }
+    }
 
     fun connect(address: String, port: Int, pairingCode: String, fingerprint: String) {
-        executor.execute {
+        enqueue {
             closeSocket()
             try {
                 require(address.isNotBlank()) { "Enter the computer's local IP address." }
@@ -110,6 +129,29 @@ internal class WifiRemoteClient(
                 writer = output
                 isConnected = true
                 onState("Connected to computer over Wi-Fi.", true)
+
+                // The desktop sends no application data after its ready response.
+                // A dedicated reader therefore watches for EOF and detects a
+                // companion shutdown even when the phone is idle.
+                Thread({
+                    try {
+                        while (input.readLine() != null) {
+                            throw IOException("Unexpected response from the desktop companion.")
+                        }
+                        if (socket === connectedSocket && isConnected) {
+                            closeSocket()
+                            onState("Desktop companion disconnected. Reconnect to continue.", false)
+                        }
+                    } catch (error: Exception) {
+                        if (socket === connectedSocket && isConnected) {
+                            closeSocket()
+                            onState(error.message ?: "Wi-Fi connection lost. Reconnect to continue.", false)
+                        }
+                    }
+                }, "AirPad-WiFi-monitor").apply {
+                    isDaemon = true
+                    start()
+                }
             } catch (error: Exception) {
                 closeSocket()
                 onState(error.message ?: "Wi-Fi connection failed.", false)
@@ -131,8 +173,8 @@ internal class WifiRemoteClient(
 
     private fun sendLine(line: String) {
         if (!isConnected) return
-        executor.execute {
-            val output = writer ?: return@execute
+        enqueue {
+            val output = writer ?: return@enqueue
             try {
                 output.write(line)
                 output.write("\n")
@@ -152,6 +194,7 @@ internal class WifiRemoteClient(
     }
 
     override fun close() {
+        closed = true
         closeSocket()
         executor.shutdownNow()
     }

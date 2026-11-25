@@ -1,0 +1,36 @@
+name: Wi-Fi Companion CI
+
+on:
+  push:
+    branches: [main, feature/wifi-companion-remote]
+    paths:
+      - 'wifi-companion/**'
+      - '.github/workflows/wifi-companion.yml'
+  pull_request:
+    paths:
+      - 'wifi-companion/**'
+      - '.github/workflows/wifi-companion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Validate desktop companion protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: wifi-companion/requirements.txt
+      - name: Compile companion source
+        run: python -m py_compile wifi-companion/host.py wifi-companion/protocol.py
+      - name: Run protocol unit tests
+        working-directory: wifi-companion
+        run: python -m unittest -v test_protocol.py

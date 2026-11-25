@@ -7,7 +7,7 @@
 
 ## Executive assessment
 
-The upgrade branch now contains a coordinated Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, deterministic unit tests, persisted basic preferences, click controls, and optional protected release signing. The latest CI run [45630040978](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45630040978) passed unit tests, Android Lint, debug/release builds, APK output checks, and uploads of both debug and unsigned release artifacts. Its separate signed-release job failed because `AIRPAD_KEYSTORE_BASE64` still contains invalid Base64 data; no signed APK was produced. The workflow split is verified: malformed signing data no longer blocks the app verification job. This is an engineering hardening milestone, not a claim of production-proven behavior: physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
+The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, unit tests, local preferences, click controls, and protected release signing. After the owner corrected the Base64 secret, run [45631031747](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45631031747) successfully decoded and validated the JKS and built/uploaded a release APK. Audit found that the old `jarsigner` check was not suitable for APK v2 signatures (it printed `jar is unsigned` while returning success). The workflow has been corrected to use Android `apksigner`, require v2 verification, and compare the APK certificate fingerprint with the configured keystore alias. Fresh validation is running in [45633420166](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45633420166). Physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
@@ -21,7 +21,7 @@ This roadmap deliberately separates verified facts from work that requires physi
 - Unit tests cover report encoding/bounds/descriptor markers and tap/pinch/swipe policy thresholds. Full MotionEvent state-machine, UI, and Android instrumentation coverage is still outstanding.
 - Pointer sensitivity and natural scrolling are persisted with SharedPreferences; DataStore migration is not implemented.
 - CI runs unit tests, Android Lint, debug and unsigned release builds in an independent verification job. A separate signing job validates protected Actions secrets, JKS format, store password and alias before building and uploading the signed release. Malformed signing secrets fail only the signing job and no longer prevent the automated app checks from running; absent secrets leave the unsigned artifacts available.
-- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1). The latest run, [45630040978](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45630040978), passed app verification and uploaded debug/unsigned APK artifacts, but signed release validation failed because the configured Base64 secret is malformed.
+- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1). Run [45631031747](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45631031747) passed both jobs and uploaded a signed APK after the secret was corrected; its previous APK verification command was inadequate. The replacement `apksigner` plus certificate-match validation is being checked by run [45633420166](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45633420166).
 - There is no INTERNET permission and no analytics/network SDK in the inspected manifest/dependency list.
 
 ## Findings and risks
@@ -32,7 +32,7 @@ This roadmap deliberately separates verified facts from work that requires physi
 2. **Registration is asynchronous.** A successful `registerApp()` return only means the request was accepted; `onAppStatusChanged()` is authoritative. Model explicit states (unsupported, permission required, Bluetooth off, profile opening, registering, ready, connected, disconnected, error) and prevent connection/report actions until their prerequisites are true.
 3. **Lifecycle callback hardening is partial.** Late callbacks are guarded after Activity teardown and registration failures close the proxy. A complete lifecycle state machine and repeated background/foreground/process-death testing remain outstanding.
 4. **Physical compatibility is unverified.** Test the actual phone firmware and at least Windows 11 plus one additional host OS before making compatibility claims.
-5. **Release artifact is unsigned.** Production distribution needs a user-controlled signing key stored only in protected CI secrets. Never add a keystore, passwords, or signing material to Git.
+5. **APK signature verification was corrected.** The signing secrets now validate and Gradle produces a release APK. The previous `jarsigner` check was not a valid APK-signature check; the workflow now requires Android `apksigner` v2 verification and a certificate fingerprint match against the configured JKS alias. The corrected check must pass before the artifact is accepted. Never add a keystore, passwords, or signing material to Git.
 
 ### P1 — Testability and maintainability
 
@@ -90,7 +90,7 @@ No third-party source code is copied into this repository by this audit. Before 
 - Upgrade to API 36-compatible toolchain.
 - Add Gradle Wrapper, dependency pinning/verification, CI permissions and action pinning strategy.
 - Add release build checks, APK metadata checks, artifact hashes, and SBOM/license reporting.
-- Optional release signing is wired to four protected GitHub Actions secrets; keep using unsigned artifacts until the owner creates and provisions the private keystore.
+- Release signing is wired to four protected GitHub Actions secrets, which are now provisioned. CI validates the JKS, builds the signed APK, verifies it with `apksigner`, and checks the signing certificate fingerprint.
 
 **Gate:** clean reproducible CI build, debug install artifact, unsigned release artifact, and documented provenance.
 
@@ -112,7 +112,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 | Test | Status |
 | --- | --- |
-| Unit tests / lint / debug and release CI | Baseline passed; upgrade branch awaiting latest CI result |
+| Unit tests / lint / debug and unsigned release CI | Passed in run 45631031747; current workflow revalidation 45633420166 in progress |
 | Android phone exposes HID Device profile | Not tested |
 | Pair and connect to Windows 10/11 | Not tested |
 | macOS / Linux host interoperability | Not tested |
@@ -121,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | App CI passed; signed release blocked by malformed `AIRPAD_KEYSTORE_BASE64` secret |
+| Signed production release | JKS decode and signed build passed in run 45631031747; corrected `apksigner` and certificate-match check pending run 45633420166 |
 
 ## Non-goals unless separately approved
 

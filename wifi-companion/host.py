@@ -80,6 +80,28 @@ def ensure_identity():
     return cert_bytes
 
 
+def is_allowed_peer_address(value):
+    """Accept only local/private peers; never serve a public-internet client."""
+    try:
+        address = ipaddress.ip_address(value.split("%", 1)[0])
+    except (ValueError, AttributeError):
+        return False
+    if address.version == 4:
+        allowed_networks = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("169.254.0.0/16"),
+            ipaddress.ip_network("127.0.0.0/8"),
+        )
+        return any(address in network for network in allowed_networks)
+    return (
+        address.is_loopback
+        or address in ipaddress.ip_network("fc00::/7")
+        or address in ipaddress.ip_network("fe80::/10")
+    )
+
+
 def local_ipv4_addresses():
     addresses = set()
     try:
@@ -202,12 +224,15 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
             desired.add(mouse.Button.right)
         if message["buttons"] & 4:
             desired.add(mouse.Button.middle)
+        # Update the held-state ledger after each successful OS call. If a
+        # later button operation fails, the connection teardown still knows
+        # which earlier button was pressed and can release it.
         for button in desired - held_buttons:
             mouse_controller.press(button)
-        for button in held_buttons - desired:
+            held_buttons.add(button)
+        for button in tuple(held_buttons - desired):
             mouse_controller.release(button)
-        held_buttons.clear()
-        held_buttons.update(desired)
+            held_buttons.discard(button)
         dx = max(-2048, min(2048, message["dx"]))
         dy = max(-2048, min(2048, message["dy"]))
         if dx or dy:
@@ -343,8 +368,15 @@ def main():
     try:
         while True:
             try:
-                connection, _ = server.accept()
+                connection, peer = server.accept()
             except socket.timeout:
+                continue
+            if not is_allowed_peer_address(peer[0]):
+                try:
+                    connection.close()
+                except OSError:
+                    pass
+                print("Rejected a non-local network peer.", file=sys.stderr)
                 continue
             try:
                 connection.settimeout(8)

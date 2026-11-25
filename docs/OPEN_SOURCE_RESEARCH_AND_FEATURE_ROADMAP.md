@@ -1,6 +1,6 @@
 # Wasti AirPad — Open-source research, product gap audit and architecture roadmap
 
-Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies.
+Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.0 is merged to main; the current follow-up branch addresses transport reliability and documentation.
 
 ## Executive direction
 
@@ -10,7 +10,7 @@ Wi-Fi requires two components:
 - Android controller: captures gestures and sends authenticated input events.
 - Desktop companion: receives events and injects native mouse/keyboard input.
 
-The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing and manual-IP fallback. It is not yet hardware-certified or ready to merge.
+The Wi-Fi implementation merged to main in AirPad 1.3.0. It uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing, automatic port fallback and manual-IP fallback. It is not yet hardware-certified.
 
 ## Current AirPad baseline
 
@@ -21,11 +21,12 @@ Already present on main after PR #1:
 - Android 16 / API 36 build configuration, Gradle wrapper, deterministic Kotlin unit tests, lint/build CI and signed APK verification.
 - Lifecycle cleanup intended to reduce stuck mouse buttons/keys.
 
-Current feature branch adds:
+AirPad 1.3.0 adds:
 - Optional Wi-Fi mode and an Android TLS client.
 - Desktop companion under wifi-companion/.
 - Certificate SHA-256 pinning and code-based authentication.
 - A bounded JSON-lines protocol allowing only mouse, key and release messages.
+- Desktop-side source-address filtering rejects non-local peers before TLS authentication.
 - Python protocol unit tests and a separate CI workflow.
 - DNS-SD/mDNS discovery, with manual IP/port fallback. No cloud service or relay.
 
@@ -38,32 +39,32 @@ Licence shown by upstream: MIT.
 Relevant ideas:
 - Native Android app plus desktop tray/console receiver.
 - Bluetooth HID and Wi-Fi transports.
-- Noise IK end-to-end encryption (X25519, ChaCha20-Poly1305, BLAKE2s).
-- QR pairing with a five-minute one-time invitation token, persistent host identity, Android Keystore-backed trust and trust-on-first-use fingerprint warnings.
+- Noise IK end-to-end encryption over UDP (X25519, ChaCha20-Poly1305, BLAKE2s).
+- QR pairing with a short-lived one-time token, persistent desktop identity, paired-client allow-list, Android Keystore-backed trust and changed-key warnings.
 - Multicast/broadcast discovery, subnet fallback, heartbeat/liveness and automatic reconnect.
-- Full text keyboard, OS-aware shortcuts, media/volume keys, presentation controls, clipboard actions and quick-launch/lock-screen actions.
-- Native desktop tray, start-at-login, signed platform packaging and per-release checksums/build attestations.
-- Windows/Linux/macOS native input injection and protocol/trust tests. Linux Wayland is supported by its native input path.
+- Full text keyboard, OS-aware shortcuts, media/volume keys, presentation controls, explicit clipboard buttons, quick-launch and lock-screen actions.
+- Optional background notification controls; desktop tray and start-at-login.
+- Windows/Linux/macOS native input injection, release checksums and build attestations. The upstream README states Linux Wayland support; test the target desktop environment rather than assuming identical behavior.
 
-Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 has now implemented local Wi-Fi, QR, discovery and TLS, but still lacks persistent client tokens, automatic reconnect, full text keyboard, OS-aware shortcut coverage, media/volume, presentation, clipboard, tray/background service, native installers and release attestations. Because Beckon is MIT-licensed, a future phase should evaluate selective, attributed reuse or a protocol-compatible migration rather than reimplementing every feature. Do not copy code without preserving the MIT copyright and licence notice; run a separate architecture/security review before any port.
+Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 has local Wi-Fi, QR, discovery and TLS, but lacks Beckon's persistent client allow-list, one-time pairing token, Noise IK transport, automatic reconnect, full text keyboard, OS-aware shortcuts, media/volume, presentation, explicit clipboard actions, tray/background controls, native installers and build attestations. The MIT licence permits reuse with its notice preserved, but the Rust desktop server and Noise UDP protocol are not drop-in replacements for AirPad's Python/TLS receiver. A migration would be a deliberate protocol and desktop-architecture project, not a small dependency addition. First prototype a separate interoperability branch with protocol tests; do not replace the current stable Bluetooth HID path.
 
 #### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
 
-| Capability | Beckon (public reference) | AirPad 1.3.0 branch |
+| Capability | Beckon (public reference) | AirPad 1.3.0 on main |
 |---|---|---|
 | Bluetooth HID without a PC agent | Yes | Yes |
-| Wi-Fi remote input | Yes, encrypted UDP/Noise | Yes, TLS TCP with pinned host certificate |
-| QR pairing | Yes, one-time invitation token | Yes, QR deep link with session code and explicit confirmation |
-| Automatic discovery | Yes, multicast/broadcast and fallback scan | Yes, DNS-SD/mDNS with manual-IP fallback |
-| Host identity / trust | Persistent public-key identity and changed-key warning | Persistent pinned certificate fingerprint; no separate persistent client token yet |
+| Wi-Fi remote input | Yes, encrypted UDP/Noise IK | Yes, TLS TCP with pinned host certificate |
+| QR pairing | Yes, short-lived one-time token and persistent paired-client trust | Yes, QR deep link with session code and explicit confirmation |
+| Automatic discovery | Yes, multicast/broadcast and subnet fallback | Yes, DNS-SD/mDNS with manual-IP fallback |
+| Host identity / trust | Persistent host public key, paired-client allow-list and changed-key warning | Persistent pinned host certificate; no persistent client token yet |
 | Port conflict fallback | Yes, dynamic ports | Yes, fixed port with automatic OS-selected fallback and advertised actual port |
-| Reconnect / liveness | Yes | Not implemented yet |
-| Keyboard text entry | Yes | Physical key/shortcut events only; no text-entry panel yet |
-| Media and volume keys | Yes | Not implemented yet |
-| Presentation remote | Yes | Not implemented yet |
-| Clipboard | Yes, explicit button action | Not implemented |
-| Background tray/service | Yes, optional desktop tray and Android foreground remote | Console companion; no tray or Android foreground service |
-| Cross-platform desktop builds | Native Windows/Linux/macOS Rust backends and release packages | Python/pynput receiver; Windows/macOS/Linux support varies by host input backend; no signed installers |
+| Reconnect / liveness | Yes, heartbeat and automatic reconnect | Disconnect detection only; user-initiated reconnect |
+| Keyboard text entry | Yes, including text-entry mode | Physical HID key/shortcut events only; no text-entry panel |
+| Media and volume keys | Yes | Not implemented |
+| Presentation remote | Yes | Not implemented |
+| Clipboard | Yes, explicit copy/paste buttons | Not implemented |
+| Background tray/service | Yes, desktop tray/start-at-login and optional Android background controls | Console companion; no tray or Android foreground service |
+| Cross-platform desktop builds | Native Windows/Linux/macOS Rust backends and release packages | Python/pynput receiver; platform support varies; no signed installers |
 | CI attestations/checksums | Published checksums and build attestations | Android signed APK pipeline; desktop package attestations not implemented |
 
 Decision: AirPad has reached the core dual-transport milestone, but it is not feature-equivalent to Beckon. The next most valuable gaps are persistent device trust, reconnect/liveness, text input, media/volume controls, and a polished signed desktop companion. Clipboard, file transfer, notifications and remote commands should remain opt-in or out of scope until there is a clear privacy/security design.

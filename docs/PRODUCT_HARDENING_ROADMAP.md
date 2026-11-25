@@ -1,138 +1,151 @@
-# Wasti AirPad — Product Hardening & Engineering Roadmap
+# Wasti AirPad — Product hardening and release acceptance
 
-**Baseline:** `main` at `db78a4ad1e124fca93b45459657f50b91ccf45d7`  
-**Baseline version:** 1.1.3  
-**Working branch:** `upgrade/reliability-product-quality`  
-**Audit date:** 2026-11-25
+**Current version:** 1.3.0 (release candidate)  
+**Repository:** https://github.com/Nabeelwasti/Wasti-AirPad  
+**Current release baseline:** main after PR #5 and follow-up dependency updates  
+**Audit date:** 25 November 2026
 
 ## Executive assessment
 
-The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, expanded unit tests, local preferences, click controls, protected release signing, and the official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. Run [45637109814](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45637109814) passed both jobs on the latest input-release code and Node 24-compatible actions: unit tests, debug/release lint, APK builds, alignment, strict Base64/JKS/PrivateKeyEntry validation, signed APK v2 verification, certificate identity match, all three artifact uploads, and temporary signing-material cleanup. Neutral mouse and keyboard reports are now sent during local cancellation/lifecycle transitions and when a host begins disconnecting. Release notes are in `docs/RELEASE_NOTES_1.2.0.md`. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
+AirPad now has two independent input transports:
 
-This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
+1. **Bluetooth HID:** the Android phone presents itself as a standard mouse/keyboard peripheral. No desktop companion is required.
+2. **Local Wi-Fi:** an optional Python desktop companion receives a narrowly allow-listed input protocol over TLS. Android pins the host certificate and requires an eight-digit session pairing code.
 
-## Verified baseline
+The 1.3.0 code line has passed Android unit tests, debug/release lint and builds, signed APK validation, Python protocol tests, CLI smoke tests and pip-audit. These are software/CI results only. Bluetooth HID compatibility, Wi-Fi discovery, synthetic desktop input and sustained use still require real hardware acceptance. Do not describe the app as fully production-certified until those tests are recorded.
 
-- Package: `com.wasti.airpad`; minimum Android API 28; target/compile API 36 on the upgrade branch.
-- Upgrade toolchain: Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17.
-- `MainActivity.kt` still owns the Activity, Bluetooth profile lifecycle, programmatic UI, drawing, and touch-event orchestration. HID descriptor/report encoding and gesture thresholds are extracted into separate pure Kotlin modules.
-- Bluetooth HID mouse and keyboard reports use report IDs 1 and 2; report submission results are now checked and failure messaging is rate-limited.
-- Activity teardown and HID registration failure paths have defensive cleanup guards. This does not replace device-level lifecycle testing.
-- Unit tests cover report encoding/bounds/descriptor markers and tap/pinch/swipe policy thresholds. Full MotionEvent state-machine, UI, and Android instrumentation coverage is still outstanding.
-- Pointer sensitivity and natural scrolling are persisted with SharedPreferences; DataStore migration is not implemented.
-- CI runs unit tests, Android Lint, debug and unsigned release builds in an independent verification job. A separate signing job validates protected Actions secrets, JKS format, store password and alias before building and uploading the signed release. Malformed signing secrets fail only the signing job and no longer prevent the automated app checks from running; absent secrets leave the unsigned artifacts available.
-- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1). Run [45631031747](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45631031747) passed both jobs and uploaded a signed APK after the secret was corrected; its previous APK verification command was inadequate. The replacement `apksigner` plus certificate-match validation passed in run [45634038228](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45634038228).
-- There is no INTERNET permission and no analytics/network SDK in the inspected manifest/dependency list.
+## Current verified capabilities
 
-## Findings and risks
+### Android / Bluetooth
+- Android 9+ minimum; compile/target API 36.
+- Bluetooth HID mouse and keyboard peripheral.
+- Pointer movement, sensitivity, click/drag, scrolling, pinch-to-zoom, multi-finger shortcuts, dedicated click controls and natural-scroll preference.
+- HID report encoding and gesture policy extracted into pure Kotlin modules with unit tests.
+- HID registration is gated before host connection; sendReport acceptance is checked.
+- Lifecycle/cancel/disconnect cleanup sends neutral reports where the transport is available.
+- Preferences are local SharedPreferences; no cloud account or telemetry.
 
-### P0 — Correctness and release blockers
+### Android / Wi-Fi
+- TLS 1.2+ client with SHA-256 host-certificate pinning.
+- Private/link-local/loopback destination validation and eight-digit session pairing code.
+- DNS-SD/mDNS discovery and QR deep-link pairing with an explicit confirmation dialog.
+- Manual IP/port/fingerprint entry remains available.
+- Bounded JSON-lines protocol routes mouse, keyboard and release messages only.
+- Bounded outbound event queue; queue saturation fails closed rather than throwing into Android touch dispatch.
+- A dedicated TLS reader detects desktop EOF/silent shutdown and updates connection state.
+- Bluetooth remains available independently and is the fallback when Wi-Fi is disconnected.
 
-1. **HID report send result is now checked.** `BluetoothHidDevice.sendReport()` acceptance is observed and failures are surfaced once until the next successful host connection. Device/host delivery still needs hardware verification.
-2. **Registration is asynchronous.** A successful `registerApp()` return only means the request was accepted; `onAppStatusChanged()` is authoritative. Model explicit states (unsupported, permission required, Bluetooth off, profile opening, registering, ready, connected, disconnected, error) and prevent connection/report actions until their prerequisites are true.
-3. **Lifecycle callback hardening is partial.** Late callbacks are guarded after Activity teardown and registration failures close the proxy. A complete lifecycle state machine and repeated background/foreground/process-death testing remain outstanding.
-4. **Physical compatibility is unverified.** Test the actual phone firmware and at least Windows 11 plus one additional host OS before making compatibility claims.
-5. **APK signature verification was corrected.** The signing secrets now validate and Gradle produces a release APK. The previous `jarsigner` check was not a valid APK-signature check; the workflow now requires Android `apksigner` v2 verification and a certificate fingerprint match against the configured JKS alias. The corrected check passed in run 45634038228. Never add a keystore, passwords, or signing material to Git.
+### Desktop companion
+- Python 3.11+; cryptography, pynput, zeroconf, and qrcode.
+- Persistent ECDSA P-256 self-signed host certificate under ~/.wasti-airpad/.
+- DNS-SD advertisement, QR pairing payload and manual connection fallback.
+- Default TCP port 47777, with automatic OS-selected port fallback if occupied.
+- Pairing-code lockout after five failed attempts for 60 seconds.
+- Mouse movement/buttons/wheel, HID-key mapping and modifier shortcuts.
+- Held mouse buttons are released when a client disconnects.
+- Windows launcher; macOS Accessibility permissions and Linux input-backend constraints apply. Linux Wayland is not certified.
 
-### P1 — Testability and maintainability
+## Supply-chain and CI controls
 
-1. Extract pure HID report encoding/descriptor validation from Android UI code.
-2. Extract gesture recognition into a platform-independent state machine that can be tested with deterministic pointer event sequences.
-3. Introduce a Bluetooth HID controller/repository boundary. Keep Android framework calls out of gesture logic.
-4. Add tests for tap timing, double-tap drag, cancellation, pointer-count transitions, scroll direction, pinch thresholds, edge scrolling, gesture reset, report clamping, key release, and disconnected sends.
-5. Add structured, privacy-safe diagnostics (state transitions and error categories only; no keystrokes, pointer coordinates, host identifiers, or user content).
+- Official Gradle Wrapper with distribution SHA-256 pinning and CI wrapper validation.
+- Android CI: unit tests, debug/release lint, debug/release APK build, alignment and checksums.
+- Protected signing job validates JKS format and PrivateKeyEntry, builds signed APK, verifies APK v2 signature, compares signer certificate to the configured keystore alias and cleans temporary signing material.
+- Separate Python CI compiles/imports modules, smoke-tests host.py --help, runs protocol tests and audits dependencies with pip-audit.
+- Dependabot is configured for dependency updates; major Gradle/AGP updates require coordinated validation.
+- No signing key, Base64 keystore, or password belongs in Git. Keep at least two encrypted backups of the release keystore.
 
-### P1 — Android platform and build
+## Known limitations — not yet complete
 
-- The upgrade branch compiles and targets API 36 using AGP 8.13.2, Kotlin 2.3.0, Gradle 8.13, and JDK 17. The official Wrapper pins the Gradle distribution and its published checksum; the next CI run must verify the Wrapper-based build.
-- Preserve minSdk 28 unless a demonstrated technical reason requires changing it.
-- The official Gradle 8.13 Wrapper is committed, its distribution SHA-256 is pinned, and CI uses `./gradlew`; Gradle's setup action validates the Wrapper JAR. GitHub Actions are upgraded to Node 24-compatible major releases.
-- Add dependency verification/version catalogs or documented pinned versions as the project grows.
-- Add static checks for dependency/license inventory and secret leakage.
-- Consider release minification only after adding release smoke checks and validating HID reflection/keep rules (if any).
+1. **No persistent client identity/token.** The desktop certificate is persistent and pinned, but the Android client still pairs with a session code on each companion launch.
+2. **No automatic reconnect or heartbeat.** Silent desktop shutdown is detected, but recovery requires the user to reconnect.
+3. **No full text-entry keyboard or on-screen keyboard layout.** Current Wi-Fi keyboard support forwards mapped HID key/shortcut events.
+4. **No media/volume key mode or presentation remote.**
+5. **No clipboard, file transfer, notification sync, screen capture, remote shell, or cloud relay.** Clipboard/file transfer and notifications require separate consent/security designs; shell and unrestricted remote command execution are intentionally excluded.
+6. **No desktop tray, background startup option, signed Windows/macOS/Linux installers, or release attestations for desktop binaries.**
+7. **No Android 17 API 37 local-network picker migration yet.** Current target is API 36; do not target API 37 until the system-mediated NSD picker is implemented and tested.
+8. **No real-device hardware certification.** CI cannot prove the Android vendor exposes Bluetooth HID Device or that each desktop input backend works.
+9. **No top-level project licence.** The repository is publicly visible but should not be marketed as open source until the owner chooses and adds a licence. Third-party licence notices do not license the project itself.
 
-### P2 — Product experience
+## Priority roadmap
 
-- Replace the current basic screen with a coherent Material 3 experience: connection card, clear primary action, large touch surface, compact mouse buttons, visible gesture hints, accessible contrast, and responsive layouts.
-- Add a first-run setup flow explaining HID support, permissions, pairing, and the distinction between pairing and HID connection.
-- Current pointer sensitivity and natural-scroll preferences use SharedPreferences. Migrate to AndroidX DataStore only when a broader settings model is introduced.
-- Add per-host profiles only after host identification and reconnect behavior are proven reliable.
-- Add keyboard, media remote, presentation mode, and numpad as separately testable modes after the HID descriptor is deliberately expanded and hosts are re-paired.
-- Add localization (English first, then Urdu) and accessibility semantics.
-- Avoid adding cloud accounts, telemetry, ads, network permissions, or unnecessary permissions to an offline input tool.
+### P0 — Release acceptance and transport reliability
+- Run the Android + Windows 10/11 hardware matrix below.
+- Verify wrong code and wrong fingerprint rejection.
+- Verify Wi-Fi drop, companion shutdown, phone app pause/resume and held-button release.
+- Verify Bluetooth still works after Wi-Fi disconnect and vice versa.
+- Add integration tests for desktop connection teardown and event queue saturation where practical.
 
-## Research references and reuse policy
+### P1 — Pairing and reconnect
+- Add a client identity generated/stored in Android Keystore.
+- Pair once using a short-lived QR invitation and explicit confirmation.
+- Store a host trust record containing host fingerprint, user label, protocol version and last-used timestamp; provide a visible remove/revoke action.
+- Add heartbeat/liveness and bounded exponential reconnect with a visible cancel/disconnect control.
+- Rotate/revoke host identity safely and warn on fingerprint changes.
 
-The following public projects informed the design review:
+### P1 — Input quality
+- Add a dedicated text-entry panel with clear Send/Cancel semantics; never capture or transmit arbitrary clipboard content automatically.
+- Expand HID key mapping with tests for punctuation, navigation, function keys and platform-specific shortcuts.
+- Add media/volume and presentation modes with host-OS capability notes.
+- Keep every input event bounded and explicit; release held state on timeout, disconnect and app lifecycle changes.
 
-- [Kurza](https://github.com/patrikflorek/Kurza) — MIT; useful separation of Bluetooth controller, HID service, touchpad UI, and gesture handler.
-- [LinkPad](https://github.com/Devdas-gupta/linkpad) — MIT; useful reference for dedicated HID service/report sender, host profiles, settings, and modular app structure.
-- [PhonePad](https://github.com/Tygb99/phonepad) — GPL-3.0-or-later; useful product scope and CI/maintenance practices. Do not copy or adapt code unless the project deliberately accepts GPL obligations.
-- [Bluetooth HID Remote](https://github.com/jqssun/android-bt-remote) — GPL-3.0; useful cross-platform HID behavior reference. Do not copy or adapt code unless GPL compliance is deliberately chosen.
-- [Bluke](https://github.com/arnv-kr/Bluke) — AGPL-3.0-or-later according to its project listing; feature/UX inspiration only unless license obligations are reviewed.
-- [Android BluetoothHidDevice API](https://developer.android.com/reference/android/bluetooth/BluetoothHidDevice.html) — authoritative lifecycle and report API contract.
-- [Android foreground-service types](https://developer.android.com/about/versions/14/changes/fgs-types-required) — relevant if a connected-device foreground service is evaluated.
+### P2 — Desktop product quality
+- Replace console-only startup with an optional tray UI and explicit start/stop controls.
+- Add signed Windows installer and macOS package; add Linux AppImage/Flatpak only after backend support is verified.
+- Keep firewall scope private-network only; never enable router port forwarding.
+- Publish checksums, provenance and an SBOM for each desktop release.
+- Test Windows, macOS and Linux/X11 separately; label Wayland support only after validation.
 
-No third-party source code is copied into this repository by this audit. Before adopting any implementation, record its exact source, license, version/commit, modifications, and required notices in a third-party notices file.
+### P2 — Android platform and UX
+- Before target SDK 37, implement Android's NSD system service picker using DiscoveryRequest.FLAG_SHOW_PICKER and service-info callbacks, or deliberately request ACCESS_LOCAL_NETWORK with a clear privacy rationale if a system picker cannot meet requirements.
+- Improve responsive layout, onboarding, accessibility semantics, landscape/tablet layout and localization (English, then Urdu).
+- Introduce an explicit connection state model rather than relying on loosely coupled booleans.
+- Consider DataStore only when the preferences model grows beyond the current small settings set.
 
-## Delivery sequence and acceptance gates
+### P3 — Optional ecosystem features
+- Wi-Fi Direct for no-router/offline use after LAN mode is stable.
+- USB/ADB connection for developer/test workflows.
+- Multi-host profiles and multi-computer switching.
+- Clipboard, file transfer, notifications and remote media integrations only as separately permissioned, opt-in modules.
 
-### Phase 1 — Safety and correctness
-- Model Bluetooth/HID states explicitly.
-- Check `sendReport()` results, gate sends on confirmed connection, and prevent host connection requests until HID registration is confirmed.
-- Make profile initialization and teardown idempotent and race-safe.
-- Guarantee release of pressed mouse buttons/keys on cancellation, disconnect, pause, and teardown where the host is still reachable.
-- Add comprehensive pure unit tests.
+## Physical acceptance matrix
 
-**Gate:** tests and lint pass; no false “connected/ready” state; no unhandled lifecycle race found in review.
+Record exact device model, Android version, computer model, host OS/version, companion version, network type and test result. Do not mark a row passed from code review alone.
 
-### Phase 2 — Build and supply-chain hardening
-- Upgrade to API 36-compatible toolchain.
-- Add Gradle Wrapper, dependency pinning/verification, CI permissions and action pinning strategy.
-- Add release build checks, APK metadata checks, artifact hashes, and SBOM/license reporting.
-- Release signing is wired to four protected GitHub Actions secrets, which are now provisioned. CI validates the JKS, builds the signed APK, verifies it with `apksigner`, and checks the signing certificate fingerprint.
+| Test | Required result | Status |
+|---|---|---|
+| Install signed APK on Redmi Note 14 Pro / Android 16 | Installs and opens; no crash | Pending owner test |
+| Bluetooth HID registration | Device registers and is discoverable | Pending owner test |
+| Pair and connect to Windows 10/11 | Stable HID connection | Pending owner test |
+| Pointer movement / sensitivity | Smooth, no stuck movement | Pending owner test |
+| Left/right click, drag and wheel | Correct buttons and scrolling | Pending owner test |
+| Keyboard shortcuts / pinch zoom | Expected host action | Pending owner test |
+| Wi-Fi DNS-SD discovery | Finds only AirPad companion on same LAN | Pending owner test |
+| QR pairing | Correct host selected; explicit confirmation | Pending owner test |
+| Wrong pairing code | Rejected and lockout applied | Pending owner test |
+| Wrong certificate fingerprint | TLS connection blocked | Pending owner test |
+| Manual IP fallback | Connects to private LAN host only | Pending owner test |
+| Desktop shutdown / Wi-Fi loss | Android reports disconnect; held mouse buttons released | Pending owner test |
+| App pause/resume / screen lock | No stuck buttons or keys | Pending owner test |
+| Bluetooth fallback after Wi-Fi | Bluetooth path remains functional | Pending owner test |
+| Sustained 30-minute session | No crashes, stuck input or unacceptable heat | Pending owner test |
+| macOS and Linux/X11 | Separate host smoke tests | Pending owner test |
+| Linux Wayland | Not certified until explicitly tested | Not certified |
 
-**Gate:** clean reproducible CI build, debug install artifact, unsigned release artifact, and documented provenance.
+## Release checklist
 
-### Phase 3 — Architecture and product UI
-- Extract Bluetooth, HID reports, gestures, preferences, and UI into separate packages.
-- Introduce DataStore-backed preferences and polished accessible UI.
-- Add onboarding, diagnostics, and host profiles.
+- [x] Android and Python CI workflows pass on main.
+- [x] Signed APK built and signature/certificate verified by CI.
+- [x] Python dependencies audited by pip-audit.
+- [x] Security policy and third-party notices committed.
+- [x] Open-source competitor and architecture research documented.
+- [ ] Physical Android 16 + Windows 10/11 acceptance matrix completed.
+- [ ] macOS/Linux host support verified or explicitly excluded from release claims.
+- [ ] Persistent trust/reconnect roadmap implemented or documented as intentionally deferred.
+- [ ] Project licence chosen by the owner and added before any open-source claim.
+- [ ] Final release tag, signed artifacts, checksums and rollback instructions published.
 
-**Gate:** UI and gesture tests, preference migration tests, no behavior regression against the current gesture reference.
+## Security and scope boundaries
 
-### Phase 4 — Hardware validation and release
-- Test on the target Android phone and a documented set of hosts.
-- Record Android version/device model, host OS, pairing, reconnect, sleep/wake, screen rotation, Bluetooth toggles, long-run stability, and battery behavior.
-- Fix all critical/high issues and publish a signed release only after the owner provisions the signing key.
+AirPad is a local input tool, not a remote desktop or general remote administration system. It must not expose shell commands, arbitrary process execution, hidden keylogging, screen capture, unrestricted clipboard access, or public-internet control. Do not port-forward the desktop companion. Keep the receiver on trusted private networks and stop it when unused.
 
-**Gate:** completed hardware matrix, signed APK/AAB, release notes, checksum, privacy statement, license notices, and rollback plan.
-
-## Hardware validation matrix
-
-| Test | Status |
-| --- | --- |
-| Unit tests / lint / debug and unsigned release CI | Passed in run 45637109814 |
-| Android phone exposes HID Device profile | Not tested |
-| Pair and connect to Windows 10/11 | Not tested |
-| macOS / Linux host interoperability | Not tested |
-| Pointer, buttons, vertical/horizontal scroll | Not tested on hardware |
-| Pinch-to-zoom and keyboard shortcuts | Not tested on hardware |
-| Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
-| Screen rotation, background/foreground, process death | Not tested on hardware |
-| 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Passed in run 45637109814: JKS validation, signed build, APK v2 verification, certificate match, alignment and artifact upload |
-
-## Non-goals unless separately approved
-
-- No remote control over the public internet. Local Wi-Fi control is optional and requires the separate desktop companion.
-- No desktop companion as a prerequisite for Bluetooth HID; Wi-Fi mode may use the optional companion.
-- No silent host commands, keylogging, screen capture, or data collection.
-- No automatic permission bypass or Bluetooth setting changes.
-- No copying GPL/AGPL code into a differently licensed product without deliberate license review.
-- No claiming “perfect”, “certified”, or “production proven” solely from CI success.
-
-
-## Local Wi-Fi mode (feature branch)
-
-A first local-network transport is being developed separately from the Bluetooth HID path. It uses a pinned TLS desktop companion, an eight-digit pairing code, a bounded allow-listed input protocol, and explicit local IP entry. It must pass both CI workflows, a security review, and real Android/desktop network testing before release. Automatic discovery, QR pairing, reconnect, signed desktop installers, and Android 17 local-network permission migration remain follow-up gates. See [Open-source research and feature roadmap](OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
+For Android 17 / API 37, Android's official local-network guidance recommends a system-mediated NSD picker for selecting one local service without requesting broad local-network permission. AirPad's one-computer pairing flow is a good fit for that path. See the official Local network permission guide and DiscoveryRequest API.

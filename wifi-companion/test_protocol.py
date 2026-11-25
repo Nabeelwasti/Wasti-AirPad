@@ -1,5 +1,8 @@
 import unittest
-from protocol import ProtocolError, decode_message
+from urllib.parse import parse_qs, urlparse
+
+from host import build_pairing_uri
+from protocol import ProtocolError, check_pairing_code, decode_message
 
 
 class ProtocolTests(unittest.TestCase):
@@ -29,6 +32,28 @@ class ProtocolTests(unittest.TestCase):
     def test_rejects_boolean_as_integer(self):
         with self.assertRaises(ProtocolError):
             decode_message(b'{"type":"key","modifiers":true,"key":4}\n')
+
+    def test_pairing_code_rate_limit_and_recovery(self):
+        state = {"failures": 0, "locked_until": 0.0}
+        for now in range(10, 15):
+            self.assertFalse(check_pairing_code("00000000", "12345678", state, now=float(now)))
+        self.assertGreater(state["locked_until"], 14.0)
+        self.assertFalse(check_pairing_code("12345678", "12345678", state, now=20.0))
+        self.assertTrue(check_pairing_code(
+            "12345678", "12345678", state, now=state["locked_until"] + 0.1
+        ))
+        self.assertEqual(state["failures"], 0)
+
+    def test_qr_pairing_uri_contains_required_values(self):
+        uri = build_pairing_uri("192.168.1.20", 47777, "12345678", "a" * 64)
+        parsed = urlparse(uri)
+        query = parse_qs(parsed.query)
+        self.assertEqual(parsed.scheme, "wastiairpad")
+        self.assertEqual(parsed.netloc, "pair")
+        self.assertEqual(query["host"], ["192.168.1.20"])
+        self.assertEqual(query["port"], ["47777"])
+        self.assertEqual(query["code"], ["12345678"])
+        self.assertEqual(query["fp"], ["a" * 64])
 
     def test_rejects_oversized_or_unframed_input(self):
         with self.assertRaises(ProtocolError):

@@ -1,6 +1,8 @@
 """Dependency-free message validator for the AirPad desktop companion."""
 from __future__ import annotations
+import hmac
 import json
+import time
 from typing import Any
 
 MAX_MESSAGE_BYTES = 4096
@@ -46,3 +48,21 @@ def _integer(value: dict[str, Any], key: str, minimum: int, maximum: int) -> int
     if not minimum <= item <= maximum:
         raise ProtocolError(f"{key} is outside the permitted range.")
     return item
+
+
+def check_pairing_code(supplied: str, expected: str, state: dict, now: float | None = None) -> bool:
+    """Constant-time pairing check with a connection-wide 60-second lockout."""
+    current = time.monotonic() if now is None else now
+    if current < state.get("locked_until", 0.0):
+        return False
+    if hmac.compare_digest(str(supplied), expected):
+        state["failures"] = 0
+        state["locked_until"] = 0.0
+        return True
+    failures = int(state.get("failures", 0)) + 1
+    if failures >= 5:
+        state["failures"] = 0
+        state["locked_until"] = current + 60.0
+    else:
+        state["failures"] = failures
+    return False

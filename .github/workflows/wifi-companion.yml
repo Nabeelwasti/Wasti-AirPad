@@ -29,8 +29,18 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: wifi-companion/requirements.txt
-      - name: Compile companion source
-        run: python -m py_compile wifi-companion/host.py wifi-companion/protocol.py
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r wifi-companion/requirements.txt
+          python -m pip install pip-audit
+      - name: Compile and import companion modules
+        run: |
+          python -m py_compile wifi-companion/host.py wifi-companion/protocol.py
+          cd wifi-companion
+          python -c "import cryptography, zeroconf, host, protocol; print('Companion imports OK')"
+      - name: Audit Python dependencies
+        run: pip-audit -r wifi-companion/requirements.txt
       - name: Run protocol unit tests
         working-directory: wifi-companion
         run: python -m unittest -v test_protocol.py

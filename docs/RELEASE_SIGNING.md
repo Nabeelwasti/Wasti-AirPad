@@ -54,11 +54,11 @@ Create these four secrets:
 | `AIRPAD_KEY_ALIAS` | `airpad` (or the alias you selected) |
 | `AIRPAD_KEY_PASSWORD` | The key password |
 
-Do not put these values in repository variables, source files, workflow YAML, pull-request comments, or this chat. GitHub Actions exposes the values to the build only as secrets. The workflow writes the keystore into the runner's temporary directory with restrictive file permissions. The signing job removes whitespace from copied Base64, accepts URL-safe Base64, restores omitted padding, and then validates the JKS format, store password, and alias before Gradle receives the signing configuration. The normal test/lint/debug/unsigned-release job runs separately, so a malformed signing secret cannot prevent the app's automated checks from running.
+Do not put these values in repository variables, source files, workflow YAML, pull-request comments, or this chat. GitHub Actions exposes the values to the build only as secrets. The workflow writes the keystore into the runner's temporary directory with restrictive file permissions. The signing job removes whitespace and normalizes URL-safe Base64, then strictly rejects invalid characters, malformed padding, and truncated input. It validates the JKS store password and requires the configured alias to be a `PrivateKeyEntry` before Gradle receives the signing configuration. The temporary keystore and validation files are removed at the end of the signing job. The normal test/lint/debug/unsigned-release job runs separately, so a malformed signing secret cannot prevent the app's automated checks from running.
 
 ## 4. Verify the signed build
 
-The Gradle release signing configuration explicitly declares `storeType = "JKS"` to match the keystore format generated above. After all four secrets are saved, trigger a new workflow run (for example, by pushing a commit to the pull-request branch). That run should upload:
+The repository includes the official Gradle 8.13 Wrapper. Its distribution URL is HTTPS-pinned and `distributionSha256Sum` is set to Gradle's published SHA-256 for the 8.13 binary distribution. CI's Gradle setup action also validates the Wrapper JAR. Use `./gradlew` (or `gradlew.bat` on Windows) for local builds. The Gradle release signing configuration explicitly declares `storeType = "JKS"` to match the keystore format generated above. After all four secrets are saved, trigger a new workflow run (for example, by pushing a commit to the pull-request branch). That run should upload:
 
 - `AirPad-apk` — debug APK for device testing.
 - `AirPad-release-signed` — signed release APK for distribution.

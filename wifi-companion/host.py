@@ -137,8 +137,8 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
             mouse_controller.release(button)
         held_buttons.clear()
         held_buttons.update(desired)
-        dx = max(-127, min(127, message["dx"]))
-        dy = max(-127, min(127, message["dy"]))
+        dx = max(-2048, min(2048, message["dx"]))
+        dy = max(-2048, min(2048, message["dy"]))
         if dx or dy:
             mouse_controller.move(dx, dy)
         if message["wheel"]:
@@ -253,6 +253,7 @@ def main():
             except socket.timeout:
                 continue
             try:
+                connection.settimeout(8)
                 tls_socket = context.wrap_socket(connection, server_side=True)
                 handle_client(tls_socket, pairing_code, auth_state)
             except (ssl.SSLError, OSError) as error:

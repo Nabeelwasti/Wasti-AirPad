@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 from pynput import keyboard, mouse
+from zeroconf import ServiceInfo, Zeroconf
 
 from protocol import MAX_MESSAGE_BYTES, ProtocolError, decode_message
 
@@ -80,6 +81,34 @@ def local_ipv4_addresses():
     return sorted(addresses, key=lambda value: (
         ipaddress.ip_address(value).is_private is False, value
     ))
+
+
+def register_discovery_service(port, fingerprint):
+    addresses = [
+        ipaddress.ip_address(value).packed
+        for value in local_ipv4_addresses()
+        if ipaddress.ip_address(value).is_private
+    ]
+    if not addresses:
+        return None, None
+    hostname = "".join(
+        char for char in socket.gethostname() if char.isalnum() or char in "-."
+    ) or "airpad-host"
+    service = ServiceInfo(
+        "_wastiairpad._tcp.local.",
+        f"Wasti AirPad {socket.gethostname()}._wastiairpad._tcp.local.",
+        addresses=addresses,
+        port=port,
+        properties={b"fingerprint": fingerprint.encode("ascii"), b"version": b"1"},
+        server=f"{hostname}.local.",
+    )
+    discovery = Zeroconf()
+    try:
+        discovery.register_service(service, allow_name_change=True)
+    except Exception:
+        discovery.close()
+        raise
+    return discovery, service
 
 
 def key_from_hid(code):
@@ -276,6 +305,12 @@ def main():
     except KeyboardInterrupt:
         print("\nStopping Wasti AirPad companion.")
     finally:
+        if zeroconf and service_info:
+            try:
+                zeroconf.unregister_service(service_info)
+            except Exception:
+                pass
+            zeroconf.close()
         server.close()
 
 

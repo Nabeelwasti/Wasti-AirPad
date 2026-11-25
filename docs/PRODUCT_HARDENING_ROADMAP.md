@@ -7,7 +7,7 @@
 
 ## Executive assessment
 
-The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, expanded unit tests, local preferences, click controls, protected release signing, and the official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. Run [45636009733](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45636009733) passed both jobs: unit tests, debug/release lint, APK builds, alignment, strict Base64/JKS/PrivateKeyEntry validation, signed APK v2 verification, certificate identity match, all three artifact uploads, and temporary signing-material cleanup. The workflow actions have since been upgraded to Node 24-compatible releases; one final CI run is required to validate those action updates. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
+The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, expanded unit tests, local preferences, click controls, protected release signing, and the official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. Run [45637109814](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45637109814) passed both jobs on the latest input-release code and Node 24-compatible actions: unit tests, debug/release lint, APK builds, alignment, strict Base64/JKS/PrivateKeyEntry validation, signed APK v2 verification, certificate identity match, all three artifact uploads, and temporary signing-material cleanup. Neutral mouse and keyboard reports are now sent during local cancellation/lifecycle transitions and when a host begins disconnecting. Release notes are in `docs/RELEASE_NOTES_1.2.0.md`. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
@@ -112,7 +112,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 | Test | Status |
 | --- | --- |
-| Unit tests / lint / debug and unsigned release CI | Passed in run 45636009733; Node 24 action-version rerun pending |
+| Unit tests / lint / debug and unsigned release CI | Passed in run 45637109814 |
 | Android phone exposes HID Device profile | Not tested |
 | Pair and connect to Windows 10/11 | Not tested |
 | macOS / Linux host interoperability | Not tested |
@@ -121,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Passed in run 45636009733: JKS validation, signed build, APK v2 verification, certificate match, alignment and artifact upload; Node 24 action-version rerun pending |
+| Signed production release | Passed in run 45637109814: JKS validation, signed build, APK v2 verification, certificate match, alignment and artifact upload |
 
 ## Non-goals unless separately approved
 

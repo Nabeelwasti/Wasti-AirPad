@@ -36,6 +36,7 @@ android {
         signingConfigs {
             create("release") {
                 storeFile = file(releaseKeystorePath!!)
+                storeType = "JKS"
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword

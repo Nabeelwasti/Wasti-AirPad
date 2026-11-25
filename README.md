@@ -113,3 +113,6 @@ AirPad does not use an account, analytics SDK, cloud relay or telemetry. Bluetoo
 - app/src/test/ — HID report and gesture policy unit tests.
 - docs/PRODUCT_HARDENING_ROADMAP.md — researched engineering roadmap and hardware acceptance matrix.
 - .github/workflows/build.yml — CI verification and APK artifact workflow.
+
+
+Current release candidate: **1.3.1**. It includes persistent Wi-Fi trust, heartbeat/reconnect, Bluetooth HID protocol negotiation, and the Test HID diagnostic control.

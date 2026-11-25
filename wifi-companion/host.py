@@ -12,6 +12,7 @@ import socket
 import ssl
 import sys
 import time
+from urllib.parse import urlencode
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 from zeroconf import ServiceInfo, Zeroconf
+import qrcode
 
 keyboard = None
 mouse = None
@@ -119,6 +121,25 @@ def register_discovery_service(port, fingerprint):
         discovery.close()
         raise
     return discovery, service
+
+
+def print_pairing_qr(address, port, pairing_code, fingerprint):
+    payload = "wastiairpad://pair?" + urlencode({
+        "host": address,
+        "port": str(port),
+        "code": pairing_code,
+        "fp": fingerprint,
+    })
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=1,
+        border=2,
+    )
+    qr.add_data(payload)
+    qr.make(fit=True)
+    print(f"Scan to pair with {address}:")
+    qr.print_ascii(invert=True)
 
 
 def key_from_hid(code):
@@ -300,8 +321,16 @@ def main():
     print("Certificate SHA-256 (enter this in AirPad):")
     print(fingerprint)
     print("Local IPv4 addresses:")
+    private_addresses = [
+        address for address in local_ipv4_addresses()
+        if ipaddress.ip_address(address).is_private
+    ]
     for address in local_ipv4_addresses():
         print(f"  {address}")
+    if private_addresses:
+        print("\nScan a pairing QR code with your phone camera:")
+        for address in private_addresses:
+            print_pairing_qr(address, args.port, pairing_code, fingerprint)
     print("\nAllow the app on Private networks only if Windows Firewall asks.")
     print("Do not forward this port on your router. Stop with Ctrl+C.\n")
     auth_state = {"failures": 0, "locked_until": 0.0}

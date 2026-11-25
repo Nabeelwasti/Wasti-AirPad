@@ -47,6 +47,10 @@ class MainActivity : Activity() {
     private var hidRegistered = false
     private var destroyed = false
     private var reportFailureShown = false
+    private var hidProtocolMode: Byte = HidReports.PROTOCOL_REPORT_MODE
+    private var keyboardLedState = 0
+    private var acceptedInputReports = 0
+    private var rejectedInputReports = 0
     private var pendingPermissionAction: (() -> Unit)? = null
     private lateinit var status: TextView
     private lateinit var pad: PadView
@@ -510,8 +514,9 @@ class MainActivity : Activity() {
                                     when (state) {
                                         BluetoothProfile.STATE_CONNECTED -> {
                                             reportFailureShown = false
+                                            hidProtocolMode = HidReports.PROTOCOL_REPORT_MODE
                                             host = device
-                                            setStatus("Connected to ${safeDeviceName(device)}")
+                                            setStatus("Connected to ${safeDeviceName(device)}. HID report mode is active.")
                                         }
                                         BluetoothProfile.STATE_CONNECTING ->
                                             setStatus("Connecting to ${safeDeviceName(device)}…")
@@ -525,6 +530,86 @@ class MainActivity : Activity() {
                                             setStatus("Not connected")
                                             pad.releaseLocalState()
                                         }
+                                    }
+                                }
+
+                                override fun onSetProtocol(device: BluetoothDevice, protocol: Byte) {
+                                    if (destroyed || host?.address != device.address) return
+                                    if (protocol != HidReports.PROTOCOL_BOOT_MODE &&
+                                        protocol != HidReports.PROTOCOL_REPORT_MODE
+                                    ) {
+                                        setStatus("The computer requested an unsupported HID protocol mode.")
+                                        return
+                                    }
+                                    hidProtocolMode = protocol
+                                    releaseAllInput()
+                                    setStatus(
+                                        if (protocol == HidReports.PROTOCOL_BOOT_MODE) {
+                                            "Connected. Computer selected standard boot HID mode."
+                                        } else {
+                                            "Connected. Computer selected full HID report mode."
+                                        }
+                                    )
+                                }
+
+                                override fun onGetReport(
+                                    device: BluetoothDevice,
+                                    type: Byte,
+                                    id: Byte,
+                                    bufferSize: Int
+                                ) {
+                                    if (destroyed || host?.address != device.address || bufferSize < 0) return
+                                    val payload = when {
+                                        type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
+                                            hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE &&
+                                            id.toInt() == 0 && bufferSize <= 3 ->
+                                            HidReports.bootMouse(0, 0, 0)
+                                        type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
+                                            hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE &&
+                                            id.toInt() == 0 ->
+                                            HidReports.EMPTY_KEYBOARD
+                                        type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
+                                            id.toInt() == HidReports.MOUSE_REPORT_ID ->
+                                            HidReports.mouse(0, 0, 0, 0)
+                                        type == BluetoothHidDevice.REPORT_TYPE_INPUT &&
+                                            id.toInt() == HidReports.KEYBOARD_REPORT_ID ->
+                                            HidReports.EMPTY_KEYBOARD
+                                        type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
+                                            id.toInt() == HidReports.KEYBOARD_REPORT_ID ->
+                                            byteArrayOf(keyboardLedState.toByte())
+                                        else -> {
+                                            try {
+                                                deviceProfile.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_RPT_ID)
+                                            } catch (_: SecurityException) { }
+                                            return
+                                        }
+                                    }
+                                    try {
+                                        val response = if (payload.size < bufferSize) payload.copyOf(bufferSize) else payload
+                                        deviceProfile.replyReport(device, type, id, response)
+                                    } catch (_: SecurityException) {
+                                        setStatus("Android denied a Bluetooth HID report response.")
+                                    } catch (_: RuntimeException) {
+                                        setStatus("The computer's HID report request could not be answered.")
+                                    }
+                                }
+
+                                override fun onSetReport(
+                                    device: BluetoothDevice,
+                                    type: Byte,
+                                    id: Byte,
+                                    data: ByteArray
+                                ) {
+                                    if (destroyed || host?.address != device.address) return
+                                    if (type == BluetoothHidDevice.REPORT_TYPE_OUTPUT &&
+                                        id.toInt() == HidReports.KEYBOARD_REPORT_ID &&
+                                        data.size == 1
+                                    ) {
+                                        keyboardLedState = data[0].toInt() and 0x1F
+                                    } else {
+                                        try {
+                                            deviceProfile.reportError(device, BluetoothHidDevice.ERROR_RSP_INVALID_PARAM)
+                                        } catch (_: SecurityException) { }
                                     }
                                 }
 
@@ -669,30 +754,64 @@ class MainActivity : Activity() {
         catch (_: SecurityException) { "Paired device" }
 
     private fun send(reportId: Int, report: ByteArray): Boolean {
-        if (!hidRegistered) return false
-        val target = host ?: return false
-        val profile = hid ?: return false
+        if (!hidRegistered) {
+            reportRejected("HID application is not registered. Keep AirPad in the foreground and wait for Ready.")
+            return false
+        }
+        val target = host
+        if (target == null) {
+            reportRejected("No Bluetooth HID host is connected. Reconnect to your computer.")
+            return false
+        }
+        val profile = hid
+        if (profile == null) {
+            reportRejected("Bluetooth HID service is unavailable. Reopen AirPad to restore it.")
+            return false
+        }
         return try {
             val accepted = profile.sendReport(target, reportId, report)
-            if (!accepted && !reportFailureShown) {
-                reportFailureShown = true
-                setStatus("Bluetooth did not accept an input report. Reconnect to your computer.")
+            if (accepted) {
+                acceptedInputReports++
+                if (reportFailureShown) reportFailureShown = false
+                if (acceptedInputReports == 1) {
+                    setStatus("Bluetooth connected. Android accepted HID input reports.")
+                }
+            } else {
+                rejectedInputReports++
+                reportRejected("Android rejected HID report ${reportId} (${report.size} bytes). Reconnect the computer.")
             }
             accepted
         } catch (_: SecurityException) {
-            if (!reportFailureShown) {
-                reportFailureShown = true
-                setStatus("Bluetooth permission was revoked. Grant Nearby devices access again.")
-            }
+            rejectedInputReports++
+            reportRejected("Bluetooth permission was revoked. Grant Nearby devices access again.")
             false
-        } catch (_: RuntimeException) {
-            if (!reportFailureShown) {
-                reportFailureShown = true
-                setStatus("Bluetooth report failed. Reconnect to your computer.")
-            }
+        } catch (error: RuntimeException) {
+            rejectedInputReports++
+            reportRejected("Bluetooth HID report failed: ${error.localizedMessage ?: "system error"}")
             false
         }
     }
+
+    private fun reportRejected(message: String) {
+        if (!reportFailureShown) {
+            reportFailureShown = true
+            setStatus(message)
+        }
+    }
+
+    private fun mouseReport(buttons: Int, dx: Int, dy: Int, wheel: Int): Pair<Int, ByteArray> =
+        if (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE) {
+            HidReports.BOOT_MOUSE_REPORT_ID to HidReports.bootMouse(buttons, dx, dy)
+        } else {
+            HidReports.MOUSE_REPORT_ID to HidReports.mouse(buttons, dx, dy, wheel)
+        }
+
+    private fun keyboardReport(modifiers: Int, keyCode: Int): Pair<Int, ByteArray> =
+        if (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE) {
+            HidReports.BOOT_KEYBOARD_REPORT_ID to HidReports.keyboard(modifiers, keyCode)
+        } else {
+            HidReports.KEYBOARD_REPORT_ID to HidReports.keyboard(modifiers, keyCode)
+        }
 
     internal fun sendMouse(buttons: Int, dx: Int, dy: Int, wheel: Int) {
         val network = wifiClient
@@ -700,7 +819,8 @@ class MainActivity : Activity() {
             network.sendMouse(buttons, dx, dy, wheel)
             return
         }
-        send(HidReports.MOUSE_REPORT_ID, HidReports.mouse(buttons, dx, dy, wheel))
+        val (reportId, report) = mouseReport(buttons, dx, dy, wheel)
+        send(reportId, report)
     }
 
     internal fun releaseAllInput() {
@@ -710,7 +830,8 @@ class MainActivity : Activity() {
             return
         }
         sendMouse(0, 0, 0, 0)
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        val (reportId, report) = keyboardReport(0, 0)
+        send(reportId, report)
     }
 
     internal fun sendKey(modifiers: Int, keyCode: Int) {
@@ -719,8 +840,10 @@ class MainActivity : Activity() {
             network.sendKey(modifiers, keyCode)
             return
         }
-        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))) {
-            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        val (reportId, report) = keyboardReport(modifiers, keyCode)
+        if (send(reportId, report)) {
+            val (releaseId, releaseReport) = keyboardReport(0, 0)
+            send(releaseId, releaseReport)
         }
     }
 
@@ -731,9 +854,11 @@ class MainActivity : Activity() {
             network.sendMouse(0, 0, 0, direction)
             return
         }
-        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))) {
+        val (reportId, report) = keyboardReport(HidReports.MOD_LEFT_CTRL, 0)
+        if (send(reportId, report)) {
             sendMouse(0, 0, 0, direction)
-            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+            val (releaseId, releaseReport) = keyboardReport(0, 0)
+            send(releaseId, releaseReport)
         }
     }
 

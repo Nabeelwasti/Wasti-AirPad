@@ -1,6 +1,6 @@
 # Wasti AirPad — Open-source research, product gap audit and architecture roadmap
 
-Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.0 is merged to main; the current follow-up branch addresses transport reliability and documentation.
+Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.0 remains the main-branch baseline. The combined AirPad 1.3.1 release candidate is in PR #12 and adds persistent Wi-Fi trust, heartbeat/reconnect and Bluetooth HID protocol handling.
 
 ## Executive direction
 
@@ -10,7 +10,7 @@ Wi-Fi requires two components:
 - Android controller: captures gestures and sends authenticated input events.
 - Desktop companion: receives events and injects native mouse/keyboard input.
 
-The Wi-Fi implementation merged to main in AirPad 1.3.0. It uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing, automatic port fallback and manual-IP fallback. It is not yet hardware-certified.
+The Wi-Fi implementation merged to main in AirPad 1.3.0. The 1.3.1 candidate adds a persistent per-phone token (Android Keystore encryption; desktop stores only SHA-256 token hashes), authenticated heartbeat, 30-second liveness timeout and bounded automatic reconnect. It uses TLS with certificate pinning, an eight-digit first-pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing, automatic port fallback and manual-IP fallback. It is not yet hardware-certified.
 
 ## Current AirPad baseline
 
@@ -21,7 +21,7 @@ Already present on main after PR #1:
 - Android 16 / API 36 build configuration, Gradle wrapper, deterministic Kotlin unit tests, lint/build CI and signed APK verification.
 - Lifecycle cleanup intended to reduce stuck mouse buttons/keys.
 
-AirPad 1.3.0 adds:
+AirPad 1.3.0 main-line features:
 - Optional Wi-Fi mode and an Android TLS client.
 - Desktop companion under wifi-companion/.
 - Certificate SHA-256 pinning and code-based authentication.
@@ -29,6 +29,12 @@ AirPad 1.3.0 adds:
 - Desktop-side source-address filtering rejects non-local peers before TLS authentication.
 - Python protocol unit tests and a separate CI workflow.
 - DNS-SD/mDNS discovery, with manual IP/port fallback. No cloud service or relay.
+
+AirPad 1.3.1 release-candidate additions:
+- Persistent per-host phone trust with encrypted Android Keystore token and hash-only desktop token storage.
+- 10-second authenticated heartbeat, 30-second timeout and bounded automatic reconnect with a five-attempt budget reset only after a 60-second stable session.
+- Bluetooth Boot/Report Protocol negotiation, GET_REPORT replies, keyboard LED output handling, sendReport diagnostics and a Test HID control.
+- Restored original palm-rejection behavior.
 
 ## Competitive and open-source scan
 
@@ -46,17 +52,17 @@ Relevant ideas:
 - Optional background notification controls; desktop tray and start-at-login.
 - Windows/Linux/macOS native input injection, release checksums and build attestations. The upstream README states Linux Wayland support; test the target desktop environment rather than assuming identical behavior.
 
-Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 has local Wi-Fi, QR, discovery and TLS, but lacks Beckon's persistent client allow-list, one-time pairing token, Noise IK transport, automatic reconnect, full text keyboard, OS-aware shortcuts, media/volume, presentation, explicit clipboard actions, tray/background controls, native installers and build attestations. The MIT licence permits reuse with its notice preserved, but the Rust desktop server and Noise UDP protocol are not drop-in replacements for AirPad's Python/TLS receiver. A migration would be a deliberate protocol and desktop-architecture project, not a small dependency addition. First prototype a separate interoperability branch with protocol tests; do not replace the current stable Bluetooth HID path.
+Decision: this is the closest direct feature-equivalent project. AirPad 1.3.1 RC now has persistent per-phone trust, authenticated heartbeat and bounded automatic reconnect, in addition to TLS, QR and discovery. It still lacks Beckon's Noise IK transport, full text keyboard, OS-aware shortcuts, media/volume, presentation, explicit clipboard actions, tray/background controls, native installers and build attestations. The MIT licence permits reuse with its notice preserved, but the Rust desktop server and Noise UDP protocol are not drop-in replacements for AirPad's Python/TLS receiver. A migration would be a deliberate protocol and desktop-architecture project, not a small dependency addition. First prototype a separate interoperability branch with protocol tests; do not replace the current stable Bluetooth HID path.
 
-#### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
+#### Direct competitor gap matrix: Beckon vs AirPad 1.3.1 RC
 
-| Capability | Beckon (public reference) | AirPad 1.3.0 on main |
+| Capability | Beckon (public reference) | AirPad 1.3.1 RC (PR #12) |
 |---|---|---|
 | Bluetooth HID without a PC agent | Yes | Yes |
 | Wi-Fi remote input | Yes, encrypted UDP/Noise IK | Yes, TLS TCP with pinned host certificate |
 | QR pairing | Yes, short-lived one-time token and persistent paired-client trust | Yes, QR deep link with session code and explicit confirmation |
 | Automatic discovery | Yes, multicast/broadcast and subnet fallback | Yes, DNS-SD/mDNS with manual-IP fallback |
-| Host identity / trust | Persistent host public key, paired-client allow-list and changed-key warning | Persistent pinned host certificate; no persistent client token yet |
+| Host identity / trust | Persistent host public key, paired-client allow-list and changed-key warning | Persistent pinned host certificate + Keystore-encrypted phone token; desktop stores token hashes only |
 | Port conflict fallback | Yes, dynamic ports | Yes, fixed port with automatic OS-selected fallback and advertised actual port |
 | Reconnect / liveness | Yes, heartbeat and automatic reconnect | Disconnect detection only; user-initiated reconnect |
 | Keyboard text entry | Yes, including text-entry mode | Physical HID key/shortcut events only; no text-entry panel |

@@ -1,18 +1,18 @@
 # Wasti AirPad — Product hardening and release acceptance
 
-**Current version:** 1.3.0 (release candidate)  
+**Current version:** 1.3.1 (release candidate)  
 **Repository:** https://github.com/Nabeelwasti/Wasti-AirPad  
-**Current release baseline:** main after PR #5 and follow-up dependency updates  
+**Current release baseline:** main at 329bca84; combined 1.3.1 candidate in PR #12  
 **Audit date:** 25 November 2026
 
 ## Executive assessment
 
-AirPad now has two independent input transports:
+AirPad 1.3.1 combines two independent input transports:
 
 1. **Bluetooth HID:** the Android phone presents itself as a standard mouse/keyboard peripheral. No desktop companion is required.
 2. **Local Wi-Fi:** an optional Python desktop companion receives a narrowly allow-listed input protocol over TLS. Android pins the host certificate and requires an eight-digit session pairing code.
 
-The 1.3.0 code line has passed Android unit tests, debug/release lint and builds, signed APK validation, Python protocol tests, CLI smoke tests and pip-audit. These are software/CI results only. Bluetooth HID compatibility, Wi-Fi discovery, synthetic desktop input and sustained use still require real hardware acceptance. Do not describe the app as fully production-certified until those tests are recorded.
+The 1.3.1 release-candidate branch has passed Android unit tests, debug/release lint and builds, signed APK validation, Python protocol tests, CLI smoke tests and pip-audit. The main branch remains unchanged while hardware acceptance is pending. These are software/CI results only. Bluetooth HID compatibility, Wi-Fi discovery, synthetic desktop input and sustained use still require real hardware acceptance. Do not describe the app as fully production-certified until those tests are recorded.
 
 ## Current verified capabilities
 
@@ -21,6 +21,8 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 - Bluetooth HID mouse and keyboard peripheral.
 - Pointer movement, sensitivity, click/drag, scrolling, pinch-to-zoom, multi-finger shortcuts, dedicated click controls and natural-scroll preference.
 - HID report encoding and gesture policy extracted into pure Kotlin modules with unit tests.
+- Host SET_PROTOCOL negotiation for Boot/Report Protocol, GET_REPORT replies, keyboard LED output reports and explicit HID send diagnostics.
+- Test HID control for pointer/Space reports with Android accepted/rejected counts.
 - HID registration is gated before host connection; sendReport acceptance is checked.
 - Lifecycle/cancel/disconnect cleanup sends neutral reports where the transport is available.
 - Preferences are local SharedPreferences; no cloud account or telemetry.
@@ -33,6 +35,7 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 - Bounded JSON-lines protocol routes mouse, keyboard and release messages only.
 - Bounded outbound event queue; queue saturation fails closed rather than throwing into Android touch dispatch.
 - A dedicated TLS reader detects desktop EOF/silent shutdown and updates connection state.
+- Authenticated 10-second heartbeat, 30-second timeout and bounded 1/2/4/8/16-second reconnect attempts (five maximum); retry budget resets only after 60 seconds of stable connection.
 - Bluetooth remains available independently and is the fallback when Wi-Fi is disconnected.
 
 ### Desktop companion
@@ -56,8 +59,8 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 
 ## Known limitations — not yet complete
 
-1. **No automatic reconnect or heartbeat.** Persistent per-host phone trust is now implemented, and silent desktop shutdown is detected, but recovery still requires the user to reconnect.
-3. **No full text-entry keyboard or on-screen keyboard layout.** Current Wi-Fi keyboard support forwards mapped HID key/shortcut events.
+1. **No background service or unlimited recovery.** Wi-Fi heartbeat and five-attempt bounded reconnect are implemented, but reconnect stops after five failures and requires user action.
+2. **No full text-entry keyboard or on-screen keyboard layout.** Current Wi-Fi keyboard support forwards mapped HID key/shortcut events.
 4. **No media/volume key mode or presentation remote.**
 5. **No clipboard, file transfer, notification sync, screen capture, remote shell, or cloud relay.** Clipboard/file transfer and notifications require separate consent/security designs; shell and unrestricted remote command execution are intentionally excluded.
 6. **No desktop tray, background startup option, signed Windows/macOS/Linux installers, or release attestations for desktop binaries.**
@@ -79,7 +82,8 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 - [x] Encrypt the phone token with a non-exportable Android Keystore AES-GCM key.
 - [x] Store only SHA-256 token hashes on the desktop; provide a local forget action and a host-side revoke-all command.
 - [x] Keep host certificate pinning and block on fingerprint mismatch.
-- [ ] Add heartbeat/liveness and bounded exponential reconnect with a visible cancel/disconnect control.
+- [x] Add a 10-second heartbeat, 30-second timeout and five-attempt exponential reconnect; reset the retry budget only after a 60-second stable session.
+- [ ] Add a visible reconnect cancel/disconnect control and more explicit connection-state UI.
 
 ### P1 — Input quality
 - Add a dedicated text-entry panel with clear Send/Cancel semantics; never capture or transmit arbitrary clipboard content automatically.
@@ -114,6 +118,7 @@ Record exact device model, Android version, computer model, host OS/version, com
 |---|---|---|
 | Install signed APK on Redmi Note 14 Pro / Android 16 | Installs and opens; no crash | Pending owner test |
 | Bluetooth HID registration | Device registers and is discoverable | Pending owner test |
+| Bluetooth Test HID | Android accepts mouse and Space reports; host receives both | Pending owner test |
 | Pair and connect to Windows 10/11 | Stable HID connection | Pending owner test |
 | Pointer movement / sensitivity | Smooth, no stuck movement | Pending owner test |
 | Left/right click, drag and wheel | Correct buttons and scrolling | Pending owner test |
@@ -132,14 +137,15 @@ Record exact device model, Android version, computer model, host OS/version, com
 
 ## Release checklist
 
-- [x] Android and Python CI workflows pass on main.
+- [x] Android and Python CI workflows pass on the 1.3.1 release-candidate branch; main remains unchanged pending hardware acceptance.
 - [x] Signed APK built and signature/certificate verified by CI.
 - [x] Python dependencies audited by pip-audit.
 - [x] Security policy and third-party notices committed.
 - [x] Open-source competitor and architecture research documented.
 - [ ] Physical Android 16 + Windows 10/11 acceptance matrix completed.
 - [ ] macOS/Linux host support verified or explicitly excluded from release claims.
-- [x] Persistent phone trust and host-side token revocation implemented; automatic reconnect remains deferred.
+- [x] Persistent phone trust, host-side token revocation, heartbeat and bounded automatic reconnect implemented.
+- [x] Bluetooth Boot/Report Protocol handling, GET_REPORT and Test HID diagnostics implemented.
 - [ ] Project licence chosen by the owner and added before any open-source claim.
 - [ ] Final release tag, signed artifacts, checksums and rollback instructions published.
 

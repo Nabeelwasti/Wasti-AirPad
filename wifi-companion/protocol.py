@@ -39,6 +39,8 @@ def decode_message(raw: bytes) -> dict[str, Any]:
         }
     if kind == "release":
         return {"type": kind}
+    if kind == "ping":
+        return {"type": kind}
     raise ProtocolError("Unsupported input message.")
 
 

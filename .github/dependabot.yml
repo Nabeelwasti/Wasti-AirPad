@@ -8,6 +8,13 @@ updates:
     labels:
       - dependencies
       - android
+    ignore:
+      # AGP 9.x and Gradle 9.x are a coordinated migration, not independent bumps.
+      # Keep the known-good AGP 8.13.2 + Gradle 8.13 toolchain until compatibility is validated together.
+      - dependency-name: "gradle-wrapper"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

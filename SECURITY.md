@@ -21,7 +21,7 @@ Please do not publish an exploitable vulnerability in a public issue. Use GitHub
 
 ## User safety
 
-- Never port-forward TCP port 47777 from a router.
+- Never port-forward the companion's TCP port (47777 by default, or the dynamically selected port) from a router.
 - Allow the desktop companion through the firewall only on Private/trusted networks.
 - Stop the companion when it is not in use.
 - If the certificate fingerprint changes unexpectedly, do not accept it until you have verified the host identity on your own computer.

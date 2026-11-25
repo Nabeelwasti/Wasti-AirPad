@@ -7,7 +7,7 @@
 
 ## Executive assessment
 
-The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, unit tests, local preferences, click controls, protected release signing, and an official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. The signed-release workflow validates strict Base64 input, JKS store password, private-key alias, APK v2 signature, signer certificate identity, and APK alignment; temporary signing files are removed after the job. Run [45634634281](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45634634281) passed both jobs before the latest Wrapper/CI hardening changes. A new full CI run on the current branch head is required to validate those final changes. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
+The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, expanded unit tests, local preferences, click controls, protected release signing, and the official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. Run [45636009733](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45636009733) passed both jobs: unit tests, debug/release lint, APK builds, alignment, strict Base64/JKS/PrivateKeyEntry validation, signed APK v2 verification, certificate identity match, all three artifact uploads, and temporary signing-material cleanup. The workflow actions have since been upgraded to Node 24-compatible releases; one final CI run is required to validate those action updates. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
@@ -46,7 +46,7 @@ This roadmap deliberately separates verified facts from work that requires physi
 
 - The upgrade branch compiles and targets API 36 using AGP 8.13.2, Kotlin 2.3.0, Gradle 8.13, and JDK 17. The official Wrapper pins the Gradle distribution and its published checksum; the next CI run must verify the Wrapper-based build.
 - Preserve minSdk 28 unless a demonstrated technical reason requires changing it.
-- The official Gradle 8.13 Wrapper is now committed, its distribution SHA-256 is pinned, and CI uses `./gradlew`; Gradle's setup action validates the Wrapper JAR.
+- The official Gradle 8.13 Wrapper is committed, its distribution SHA-256 is pinned, and CI uses `./gradlew`; Gradle's setup action validates the Wrapper JAR. GitHub Actions are upgraded to Node 24-compatible major releases.
 - Add dependency verification/version catalogs or documented pinned versions as the project grows.
 - Add static checks for dependency/license inventory and secret leakage.
 - Consider release minification only after adding release smoke checks and validating HID reflection/keep rules (if any).
@@ -112,7 +112,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 | Test | Status |
 | --- | --- |
-| Unit tests / lint / debug and unsigned release CI | Passed in run 45634634281 before latest Wrapper/CI changes; final rerun pending |
+| Unit tests / lint / debug and unsigned release CI | Passed in run 45636009733; Node 24 action-version rerun pending |
 | Android phone exposes HID Device profile | Not tested |
 | Pair and connect to Windows 10/11 | Not tested |
 | macOS / Linux host interoperability | Not tested |
@@ -121,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Passed in run 45634634281 before latest Wrapper/CI changes; final rerun pending |
+| Signed production release | Passed in run 45636009733: JKS validation, signed build, APK v2 verification, certificate match, alignment and artifact upload; Node 24 action-version rerun pending |
 
 ## Non-goals unless separately approved
 

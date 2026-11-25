@@ -660,6 +660,17 @@ class MainActivity : Activity() {
                                     }
                                 }
 
+                                override fun onInterruptData(
+                                    device: BluetoothDevice,
+                                    reportId: Byte,
+                                    data: ByteArray
+                                ) {
+                                    if (destroyed || host?.address != device.address) return
+                                    if (reportId.toInt() == HidReports.KEYBOARD_REPORT_ID && data.size == 1) {
+                                        keyboardLedState = data[0].toInt() and 0x1F
+                                    }
+                                }
+
                                 override fun onVirtualCableUnplug(device: BluetoothDevice) {
                                     if (destroyed) return
                                     if (host?.address == device.address) host = null

@@ -259,6 +259,9 @@ class MainActivity : Activity() {
                     }
                     val deviceProfile = proxy as? BluetoothHidDevice
                     if (deviceProfile == null) {
+                        try { bluetoothAdapter?.closeProfileProxy(profile, proxy) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         profileRequested = false
                         setStatus("This device does not provide the Bluetooth HID Device profile.")
                         return
@@ -428,8 +431,11 @@ class MainActivity : Activity() {
                     val target = devices.getOrNull(index) ?: return@setItems
                     try {
                         val profile = hid
-                        if (profile == null) {
-                            setStatus("Bluetooth HID is still starting. Wait a moment and tap Connect again.")
+                        if (profile == null || !hidRegistered) {
+                            setStatus(
+                                if (profile == null) "Bluetooth HID is still starting. Wait a moment and tap Connect again."
+                                else "Bluetooth HID registration is not ready yet. Wait for the Ready status and try again."
+                            )
                             return@setItems
                         }
                         val accepted = profile.connect(target)

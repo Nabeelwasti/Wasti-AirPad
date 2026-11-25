@@ -5,12 +5,16 @@ import java.io.BufferedWriter
 import java.io.Closeable
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
-import java.util.concurrent.Executors
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
@@ -20,9 +24,12 @@ import javax.net.ssl.X509TrustManager
 internal class WifiRemoteClient(
     private val onState: (message: String, connected: Boolean) -> Unit
 ) : Closeable {
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "AirPad-WiFi").apply { isDaemon = true }
-    }
+    private val executor = ThreadPoolExecutor(
+        1, 1, 0L, TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue<Runnable>(512),
+        { runnable -> Thread(runnable, "AirPad-WiFi").apply { isDaemon = true } },
+        ThreadPoolExecutor.AbortPolicy()
+    )
 
     @Volatile private var socket: SSLSocket? = null
     @Volatile private var writer: BufferedWriter? = null
@@ -35,6 +42,12 @@ internal class WifiRemoteClient(
             try {
                 require(address.isNotBlank()) { "Enter the computer's local IP address." }
                 require(port in 1..65535) { "Port must be between 1 and 65535." }
+                val resolvedAddress = InetAddress.getByName(address)
+                require(
+                    resolvedAddress.isSiteLocalAddress ||
+                        resolvedAddress.isLinkLocalAddress ||
+                        resolvedAddress.isLoopbackAddress
+                ) { "Use the computer's private local-network IP address, not a public internet address." }
                 require(pairingCode.matches(Regex("[0-9]{8}"))) { "Pairing code must contain 8 digits." }
                 val expectedFingerprint = fingerprint
                     .filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
@@ -75,7 +88,7 @@ internal class WifiRemoteClient(
                 context.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
                 val connectedSocket = (context.socketFactory.createSocket() as SSLSocket).apply {
                     soTimeout = 7000
-                    connect(InetSocketAddress(address, port), 7000)
+                    connect(InetSocketAddress(resolvedAddress, port), 7000)
                     enabledProtocols = enabledProtocols.filter {
                         it == "TLSv1.3" || it == "TLSv1.2"
                     }.toTypedArray()

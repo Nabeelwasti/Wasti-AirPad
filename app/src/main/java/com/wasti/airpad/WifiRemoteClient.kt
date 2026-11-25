@@ -230,7 +230,7 @@ internal class WifiRemoteClient(
                             reconnectAttempts = 0
                         }
                     }
-                }, STABLE_CONNECTION_RESET_SECONDS, TimeUnit.SECONDS)
+                }, WifiReconnectPolicy.STABLE_CONNECTION_RESET_SECONDS, TimeUnit.SECONDS)
             } catch (_: RejectedExecutionException) {
                 null
             }
@@ -400,6 +400,5 @@ internal class WifiRemoteClient(
         private const val CONNECT_TIMEOUT_MS = 7_000
         private const val HEARTBEAT_INTERVAL_SECONDS = 10L
         private const val HEARTBEAT_TIMEOUT_MS = 30_000
-        private const val STABLE_CONNECTION_RESET_SECONDS = 60L
     }
 }

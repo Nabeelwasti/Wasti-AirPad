@@ -368,7 +368,12 @@ def handle_client(tls_socket, pairing_code, auth_state, trusted_hashes):
                 raw = stream.readline(MAX_MESSAGE_BYTES + 1)
                 if not raw:
                     break
-                apply_input(decode_message(raw), mouse_controller, keyboard_controller, held_buttons)
+                message = decode_message(raw)
+                if message["type"] == "ping":
+                    stream.write(b'{"type":"pong"}\\n')
+                    stream.flush()
+                    continue
+                apply_input(message, mouse_controller, keyboard_controller, held_buttons)
         except Exception as error:
             print(f"Input connection closed: {error}", file=sys.stderr)
         finally:

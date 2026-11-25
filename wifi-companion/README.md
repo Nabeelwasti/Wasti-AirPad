@@ -18,9 +18,11 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 
 1. Install Python 3.11 or newer from https://www.python.org/downloads/ and enable the Python launcher.
 2. Extract or clone this repository.
-3. Double-click run-windows.bat. The first run installs the three free Python dependencies.
+3. Double-click run-windows.bat. The first run installs the four free Python dependencies.
 4. If Windows Firewall asks, allow AirPad on Private networks only.
-5. Keep the companion window open. It prints the computer's local IPv4 address, port (47777), eight-digit pairing code, and certificate SHA-256 fingerprint. It also advertises the host on the local network for AirPad discovery and prints a QR pairing code for each private IPv4 address.
+5. Keep the companion window open. It prints the computer's local IPv4 address, actual local port (normally 47777; it selects a free port automatically if busy), eight-digit pairing code, and certificate SHA-256 fingerprint. It also advertises the host on the local network for AirPad discovery and prints a QR pairing code for each private IPv4 address.
+
+If you need to choose a port explicitly, run python host.py --port 0 to let the operating system select one, or python host.py --port 47800 to request a specific port. The selected port is always advertised and included in the QR code.
 
 On macOS/Linux, open a terminal in this folder and run:
 

@@ -30,13 +30,15 @@ internal class WifiRemoteClient(
     private val onState: (message: String, connected: Boolean) -> Unit,
     private val onPairingToken: (token: String) -> Unit = {}
 ) : Closeable {
-    private data class ConnectionConfig(
+    private class ConnectionConfig(
         val address: String,
         val port: Int,
         val pairingCode: String,
         val fingerprint: String,
-        @Volatile var trustedToken: String?
-    )
+        trustedToken: String?
+    ) {
+        @Volatile var trustedToken: String? = trustedToken
+    }
 
     private val executor = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS,

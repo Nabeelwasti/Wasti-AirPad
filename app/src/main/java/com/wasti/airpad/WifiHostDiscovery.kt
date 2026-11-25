@@ -59,7 +59,7 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
 
                         override fun onServiceResolved(info: NsdServiceInfo) {
                             val address = info.host?.hostAddress
-                            val fingerprint = info.getAttribute("fingerprint")
+                            val fingerprint = info.attributes["fingerprint"]
                                 ?.toString(Charsets.UTF_8)
                             if (address != null && fingerprint != null &&
                                 fingerprint.matches(Regex("[0-9a-fA-F]{64}"))

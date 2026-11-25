@@ -77,8 +77,11 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 
 ## Project structure
 
-- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI, Bluetooth HID lifecycle, and touch gestures.
+- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI and Bluetooth HID lifecycle.
+- app/src/main/java/com/wasti/airpad/HidReports.kt — HID descriptor and report encoding.
+- app/src/main/java/com/wasti/airpad/GesturePolicy.kt — deterministic gesture classification thresholds.
 - app/src/main/AndroidManifest.xml — Bluetooth permissions and application declaration.
 - app/build.gradle.kts — Android configuration and unit-test dependency.
-- app/src/test/ — HID report unit tests.
+- app/src/test/ — HID report and gesture policy unit tests.
+- docs/PRODUCT_HARDENING_ROADMAP.md — researched engineering roadmap and hardware acceptance matrix.
 - .github/workflows/build.yml — CI verification and APK artifact workflow.

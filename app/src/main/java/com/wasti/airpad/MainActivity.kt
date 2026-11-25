@@ -267,13 +267,27 @@ class MainActivity : Activity() {
             .putString("wifi_fingerprint", certificateFingerprint)
             .apply()
         wifiClient?.close()
+        val trustStore = WifiTrustedHostStore(this)
+        val trustedToken = trustStore.getToken(certificateFingerprint)
+        var tokenSaveFailed = false
         lateinit var newClient: WifiRemoteClient
-        newClient = WifiRemoteClient { message, _ ->
-            if (wifiClient === newClient) setStatus(message)
-        }
+        newClient = WifiRemoteClient(
+            onState = { message, connected ->
+                if (wifiClient === newClient) {
+                    setStatus(
+                        if (connected && tokenSaveFailed) {
+                            "Connected, but secure device trust could not be saved. Re-pair next time."
+                        } else message
+                    )
+                }
+            },
+            onPairingToken = { token ->
+                tokenSaveFailed = !trustStore.storeToken(certificateFingerprint, token)
+            }
+        )
         wifiClient = newClient
         setStatus("Connecting securely to $hostAddress…")
-        newClient.connect(hostAddress, hostPort, pairingCode, certificateFingerprint)
+        newClient.connect(hostAddress, hostPort, pairingCode, certificateFingerprint, trustedToken)
     }
 
     private fun handlePairingIntent(intent: Intent?) {
@@ -321,7 +335,7 @@ class MainActivity : Activity() {
             if (text.isNullOrBlank()) setText("47777")
         }
         val code = EditText(this).apply {
-            hint = "8-digit pairing code"
+            hint = "8-digit pairing code (new computers only)"
             inputType = InputType.TYPE_CLASS_NUMBER
             setSingleLine(true)
             contentDescription = hint
@@ -362,10 +376,25 @@ class MainActivity : Activity() {
         form.addView(port)
         form.addView(code)
         form.addView(fingerprint)
+        form.addView(Button(this).apply {
+            text = "Forget saved trust for this computer"
+            setOnClickListener {
+                val savedFingerprint = fingerprint.text.toString().trim()
+                if (WifiTrustedHostStore(this@MainActivity).forget(savedFingerprint)) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Phone trust removed. To revoke all old tokens on the computer, run: python host.py --forget-clients",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "No saved trust found for this fingerprint.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Connect over Wi-Fi")
-            .setMessage("Start the Wasti AirPad desktop companion on your computer first. Enter the local IP, pairing code and certificate fingerprint shown there.")
+            .setMessage("Start the Wasti AirPad desktop companion. First pairing needs the 8-digit code and certificate fingerprint. After pairing, AirPad remembers this computer securely and the code is no longer needed on this phone.")
             .setView(form)
             .setPositiveButton("Connect", null)
             .setNegativeButton("Cancel", null)
@@ -380,10 +409,17 @@ class MainActivity : Activity() {
                 val hostPort = port.text.toString().trim().toIntOrNull()
                 val pairingCode = code.text.toString().trim()
                 val certificateFingerprint = fingerprint.text.toString().trim()
+                val hasSavedTrust = WifiTrustedHostStore(this).getToken(certificateFingerprint) != null
                 if (hostAddress.isBlank() || hostPort == null || hostPort !in 1..65535 ||
-                    !pairingCode.matches(Regex("[0-9]{8}")) || certificateFingerprint.isBlank()
+                    (!hasSavedTrust && !pairingCode.matches(Regex("[0-9]{8}"))) ||
+                    certificateFingerprint.isBlank()
                 ) {
-                    Toast.makeText(this, "Enter a valid IP, port, 8-digit code and fingerprint.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        if (hasSavedTrust) "Enter a valid local IP, port and certificate fingerprint."
+                        else "Enter a valid local IP, port, 8-digit pairing code and fingerprint.",
+                        Toast.LENGTH_LONG
+                    ).show()
                     return@setOnClickListener
                 }
                 connectWifi(hostAddress, hostPort, pairingCode, certificateFingerprint)

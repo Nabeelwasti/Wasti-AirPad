@@ -1,6 +1,6 @@
 # Wasti AirPad
 
-Current branch release candidate: **1.3.0**. See [release notes](docs/RELEASE_NOTES_1.3.0.md), [third-party notices](THIRD_PARTY_NOTICES.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
+Current branch release candidate: **1.3.0**. See [release notes](docs/RELEASE_NOTES_1.3.0.md), [third-party notices](THIRD_PARTY_NOTICES.md), [security policy](SECURITY.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
 
 Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse and touchpad for a paired computer. The phone presents itself as a Bluetooth HID device; the computer receives standard mouse and keyboard reports without a companion desktop application.
 

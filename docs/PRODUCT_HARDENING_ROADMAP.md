@@ -7,27 +7,30 @@
 
 ## Executive assessment
 
-The current app is a compact, offline Android Bluetooth HID touchpad with a passing CI pipeline. It is a useful functional baseline, but it is not yet a production-grade product. Its largest risks are lifecycle correctness, HID report delivery observability, limited automated gesture coverage, a monolithic Activity, an old Android build target, and the absence of a repeatable physical-device compatibility matrix.
+The upgrade branch now contains a coordinated Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, deterministic unit tests, persisted basic preferences, click controls, and optional protected release signing. The latest upgrade CI is still being validated; the previous run failed Android Lint on an API-level guard, which has been corrected. This is an engineering hardening milestone, not a claim of production-proven behavior: physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
 ## Verified baseline
 
-- Package: `com.wasti.airpad`; minimum Android API 28; target/compile API 34.
-- Android Gradle Plugin 8.5.2, Kotlin 1.9.24, Gradle 8.7 in CI, JDK 17.
-- Main implementation is concentrated in `MainActivity.kt` (Activity, Bluetooth profile lifecycle, UI, HID report encoding, drawing, and gesture recognition).
-- Bluetooth HID mouse and keyboard reports use report IDs 1 and 2.
-- CI currently runs local unit tests, Android lint, debug APK build, unsigned release APK build, output checks, and artifact upload.
-- Latest baseline CI run: [run 45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284), successful.
+- Package: `com.wasti.airpad`; minimum Android API 28; target/compile API 36 on the upgrade branch.
+- Upgrade toolchain: Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17.
+- `MainActivity.kt` still owns the Activity, Bluetooth profile lifecycle, programmatic UI, drawing, and touch-event orchestration. HID descriptor/report encoding and gesture thresholds are extracted into separate pure Kotlin modules.
+- Bluetooth HID mouse and keyboard reports use report IDs 1 and 2; report submission results are now checked and failure messaging is rate-limited.
+- Activity teardown and HID registration failure paths have defensive cleanup guards. This does not replace device-level lifecycle testing.
+- Unit tests cover report encoding/bounds/descriptor markers and tap/pinch/swipe policy thresholds. Full MotionEvent state-machine, UI, and Android instrumentation coverage is still outstanding.
+- Pointer sensitivity and natural scrolling are persisted with SharedPreferences; DataStore migration is not implemented.
+- CI runs unit tests, Android Lint, debug and release builds, APK output checks, and artifact uploads. Release signing is optional and reads only protected Actions secrets; absent secrets produce an unsigned release artifact.
+- The original baseline CI run [45611559284](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45611559284) passed. The latest upgrade CI run must pass before merge; see [PR #1](https://github.com/Nabeelwasti/Wasti-AirPad/pull/1).
 - There is no INTERNET permission and no analytics/network SDK in the inspected manifest/dependency list.
 
 ## Findings and risks
 
 ### P0 — Correctness and release blockers
 
-1. **HID report send result is discarded.** `BluetoothHidDevice.sendReport()` returns a Boolean, but the current wrapper ignores it. The UI can appear connected while a report submission is rejected. Track connection and registration state separately, check every submission result, and surface actionable failures without spamming the UI.
+1. **HID report send result is now checked.** `BluetoothHidDevice.sendReport()` acceptance is observed and failures are surfaced once until the next successful host connection. Device/host delivery still needs hardware verification.
 2. **Registration is asynchronous.** A successful `registerApp()` return only means the request was accepted; `onAppStatusChanged()` is authoritative. Model explicit states (unsupported, permission required, Bluetooth off, profile opening, registering, ready, connected, disconnected, error) and prevent connection/report actions until their prerequisites are true.
-3. **Lifecycle callbacks can race Activity teardown.** Guard late profile callbacks, avoid updating destroyed views, close the proxy exactly once, and make initialization/cleanup idempotent.
+3. **Lifecycle callback hardening is partial.** Late callbacks are guarded after Activity teardown and registration failures close the proxy. A complete lifecycle state machine and repeated background/foreground/process-death testing remain outstanding.
 4. **Physical compatibility is unverified.** Test the actual phone firmware and at least Windows 11 plus one additional host OS before making compatibility claims.
 5. **Release artifact is unsigned.** Production distribution needs a user-controlled signing key stored only in protected CI secrets. Never add a keystore, passwords, or signing material to Git.
 
@@ -41,8 +44,7 @@ This roadmap deliberately separates verified facts from work that requires physi
 
 ### P1 — Android platform and build
 
-- Google Play's current requirement (as of this audit) is API 36 for new apps and updates from 2026-08-31. The app currently targets API 34.
-- API 36 is supported by AGP 8.9.1 or newer; AGP 8.13 supports API 36.1 and requires Gradle 8.13. Upgrade the toolchain as a coordinated, CI-verified change rather than changing only `targetSdk`.
+- The upgrade branch now compiles and targets API 36 using AGP 8.13.2, Kotlin 2.3.0, Gradle 8.13, and JDK 17. The latest CI result is the acceptance check for this coordinated change.
 - Preserve minSdk 28 unless a demonstrated technical reason requires changing it.
 - Add the Gradle Wrapper and pin its distribution/checksum so local and CI builds use the same Gradle version.
 - Add dependency verification/version catalogs or documented pinned versions as the project grows.
@@ -53,7 +55,7 @@ This roadmap deliberately separates verified facts from work that requires physi
 
 - Replace the current basic screen with a coherent Material 3 experience: connection card, clear primary action, large touch surface, compact mouse buttons, visible gesture hints, accessible contrast, and responsive layouts.
 - Add a first-run setup flow explaining HID support, permissions, pairing, and the distinction between pairing and HID connection.
-- Persist preferences (pointer speed, natural scrolling, haptics, gesture toggles, theme) using AndroidX DataStore.
+- Current pointer sensitivity and natural-scroll preferences use SharedPreferences. Migrate to AndroidX DataStore only when a broader settings model is introduced.
 - Add per-host profiles only after host identification and reconnect behavior are proven reliable.
 - Add keyboard, media remote, presentation mode, and numpad as separately testable modes after the HID descriptor is deliberately expanded and hosts are re-paired.
 - Add localization (English first, then Urdu) and accessibility semantics.
@@ -88,7 +90,7 @@ No third-party source code is copied into this repository by this audit. Before 
 - Upgrade to API 36-compatible toolchain.
 - Add Gradle Wrapper, dependency pinning/verification, CI permissions and action pinning strategy.
 - Add release build checks, APK metadata checks, artifact hashes, and SBOM/license reporting.
-- Keep release unsigned until the owner supplies secure signing credentials.
+- Optional release signing is wired to four protected GitHub Actions secrets; keep using unsigned artifacts until the owner creates and provisions the private keystore.
 
 **Gate:** clean reproducible CI build, debug install artifact, unsigned release artifact, and documented provenance.
 
@@ -110,7 +112,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 | Test | Status |
 | --- | --- |
-| Unit tests / lint / debug and unsigned release CI | Passed on baseline commit |
+| Unit tests / lint / debug and release CI | Baseline passed; upgrade branch awaiting latest CI result |
 | Android phone exposes HID Device profile | Not tested |
 | Pair and connect to Windows 10/11 | Not tested |
 | macOS / Linux host interoperability | Not tested |
@@ -119,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Blocked on secure owner-provided signing credentials |
+| Signed production release | Signing workflow configured; blocked until owner provisions secrets and a signed run is verified |
 
 ## Non-goals unless separately approved
 

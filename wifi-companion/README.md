@@ -43,7 +43,7 @@ The certificate and private key are stored in `~/.wasti-airpad/` and reused on l
 
 ## Security notes
 
-- The receiver binds to local interfaces on the selected port. Do not forward that port from your router or expose it to the public internet.
+- The receiver listens on its selected port but rejects source addresses outside private, link-local and loopback ranges before TLS authentication. Do not forward that port from your router or expose it to the public internet.
 - TLS certificate pinning protects against a local-network impostor; the pairing code adds a second check.
 - The pairing code changes each time the companion starts. The QR contains this session code, so treat it as a temporary credential and do not share its screenshot. The certificate fingerprint remains stable until the host identity files are removed.
 - The receiver accepts only bounded mouse, key, and release messages. It does not provide shell execution, file access, clipboard access, or screen capture.

@@ -6,25 +6,40 @@ import org.junit.Test
 
 class GesturePolicyTest {
     @Test
-    fun tapRequiresShortDurationAndLowMovement() {
-        assertTrue(GesturePolicy.isTap(100L, 10f, 1f))
-        assertFalse(GesturePolicy.isTap(250L, 1f, 1f))
-        assertFalse(GesturePolicy.isTap(100L, 24f, 1f))
-        assertFalse(GesturePolicy.isTap(-1L, 1f, 1f))
+    fun tapRequiresShortDurationAndLimitedMotion() {
+        assertTrue(GesturePolicy.isTap(100, 10f, 1f))
+        assertFalse(GesturePolicy.isTap(300, 10f, 1f))
+        assertFalse(GesturePolicy.isTap(100, 30f, 1f))
     }
 
     @Test
-    fun pinchMustDominateVerticalMovementAndExceedDensityThreshold() {
-        assertTrue(GesturePolicy.isPinch(20f, 5f, 1f))
-        assertFalse(GesturePolicy.isPinch(2f, 5f, 1f))
+    fun tapBoundaryIsDeterministic() {
+        assertTrue(GesturePolicy.isTap(0, 0f, 1f))
+        assertTrue(GesturePolicy.isTap(249, 23.9f, 1f))
+        assertFalse(GesturePolicy.isTap(250, 0f, 1f))
+        assertFalse(GesturePolicy.isTap(100, 24f, 1f))
+        assertFalse(GesturePolicy.isTap(-1, 0f, 1f))
+    }
+
+    @Test
+    fun pinchRequiresDominantHorizontalDistanceChange() {
+        assertTrue(GesturePolicy.isPinch(20f, 2f, 1f))
+        assertFalse(GesturePolicy.isPinch(2f, 20f, 1f))
         assertFalse(GesturePolicy.isPinch(1f, 0f, 1f))
-        assertFalse(GesturePolicy.isPinch(2f, 0f, 2f))
     }
 
     @Test
-    fun swipeThresholdScalesWithDisplayDensity() {
-        assertTrue(GesturePolicy.isSwipe(0f, -101f, 1f))
+    fun pinchBoundaryAndDirectionAreSymmetric() {
+        assertTrue(GesturePolicy.isPinch(-20f, 2f, 1f))
+        assertFalse(GesturePolicy.isPinch(1.5f, 0f, 1f))
+        assertFalse(GesturePolicy.isPinch(13f, 20f, 1f))
+    }
+
+    @Test
+    fun swipeRequiresMovementBeyondThreshold() {
+        assertTrue(GesturePolicy.isSwipe(120f, 0f, 1f))
+        assertTrue(GesturePolicy.isSwipe(0f, -120f, 1f))
+        assertFalse(GesturePolicy.isSwipe(50f, 50f, 1f))
         assertFalse(GesturePolicy.isSwipe(100f, 0f, 1f))
-        assertTrue(GesturePolicy.isSwipe(0f, 201f, 2f))
     }
 }

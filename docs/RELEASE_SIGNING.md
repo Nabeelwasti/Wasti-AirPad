@@ -54,7 +54,7 @@ Create these four secrets:
 | `AIRPAD_KEY_ALIAS` | `airpad` (or the alias you selected) |
 | `AIRPAD_KEY_PASSWORD` | The key password |
 
-Do not put these values in repository variables, source files, workflow YAML, pull-request comments, or this chat. GitHub Actions exposes the values to the build only as secrets. The workflow writes the keystore into the runner's temporary directory with restrictive file permissions.
+Do not put these values in repository variables, source files, workflow YAML, pull-request comments, or this chat. GitHub Actions exposes the values to the build only as secrets. The workflow writes the keystore into the runner's temporary directory with restrictive file permissions. The signing job removes whitespace from copied Base64, accepts URL-safe Base64, restores omitted padding, and then validates the JKS format, store password, and alias before Gradle receives the signing configuration. The normal test/lint/debug/unsigned-release job runs separately, so a malformed signing secret cannot prevent the app's automated checks from running.
 
 ## 4. Verify the signed build
 
@@ -63,7 +63,7 @@ The Gradle release signing configuration explicitly declares `storeType = "JKS"`
 - `AirPad-apk` — debug APK for device testing.
 - `AirPad-release-signed` — signed release APK for distribution.
 
-The workflow verifies that the signed APK exists and prints its SHA-256 checksum. If signing secrets are absent, it safely falls back to an unsigned release artifact; it does not silently use the Android debug key as a release key.
+The workflow verifies that the signed APK exists and prints its SHA-256 checksum. If signing secrets are absent, the signing job reports an unsigned-only configuration and the verified unsigned release artifact remains available; it does not silently use the Android debug key as a release key. If the signing job reports invalid Base64, recreate `AIRPAD_KEYSTORE_BASE64` from the complete output of `base64 -w 0 airpad-release.jks` (or the PowerShell command above). Do not include shell prompts, command text, quotes, or explanatory text in the secret. If decoding succeeds but JKS validation fails, verify the existing store password and alias locally with `keytool -list -v -keystore airpad-release.jks -storetype JKS -alias airpad`; never share the key or passwords.
 
 ## 5. Protect and back up the key
 

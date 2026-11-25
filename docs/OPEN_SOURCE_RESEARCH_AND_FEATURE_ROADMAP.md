@@ -45,7 +45,27 @@ Relevant ideas:
 
 Decision: use as an architecture and security benchmark. Its MIT licence is permissive, but do not copy code without preserving required copyright/licence notices. AirPad's current TLS pinning approach is a simpler first implementation; a Noise-based protocol is a future hardening option if independently reviewed.
 
-### 2. KDE Connect — mature feature breadth reference
+#### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
+
+| Capability | Beckon (public reference) | AirPad 1.3.0 branch |
+|---|---|---|
+| Bluetooth HID without a PC agent | Yes | Yes |
+| Wi-Fi remote input | Yes, encrypted UDP/Noise | Yes, TLS TCP with pinned host certificate |
+| QR pairing | Yes, one-time invitation token | Yes, QR deep link with session code and explicit confirmation |
+| Automatic discovery | Yes, multicast/broadcast and fallback scan | Yes, DNS-SD/mDNS with manual-IP fallback |
+| Host identity / trust | Persistent public-key identity and changed-key warning | Persistent pinned certificate fingerprint; no separate persistent client token yet |
+| Reconnect / liveness | Yes | Not implemented yet |
+| Keyboard text entry | Yes | Physical key/shortcut events only; no text-entry panel yet |
+| Media and volume keys | Yes | Not implemented yet |
+| Presentation remote | Yes | Not implemented yet |
+| Clipboard | Yes, explicit button action | Not implemented |
+| Background tray/service | Yes, optional desktop tray and Android foreground remote | Console companion; no tray or Android foreground service |
+| Cross-platform desktop builds | Native Windows/Linux/macOS Rust backends and release packages | Python/pynput receiver; Windows/macOS/Linux support varies by host input backend; no signed installers |
+| CI attestations/checksums | Published checksums and build attestations | Android signed APK pipeline; desktop package attestations not implemented |
+
+Decision: AirPad has reached the core dual-transport milestone, but it is not feature-equivalent to Beckon. The next most valuable gaps are persistent device trust, reconnect/liveness, text input, media/volume controls, and a polished signed desktop companion. Clipboard, file transfer, notifications and remote commands should remain opt-in or out of scope until there is a clear privacy/security design.
+
+## 2. KDE Connect — mature feature breadth reference
 Android mirror: https://github.com/KDE/kdeconnect-android  
 Desktop: https://github.com/KDE/kdeconnect-kde  
 Licence shown by Android mirror: GPL-2.0 / GPL-3.0.

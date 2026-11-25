@@ -8,6 +8,8 @@
 - Verify the desktop's TLS certificate using its SHA-256 fingerprint before input is sent.
 - Forward mouse movement, left/right/middle buttons, scrolling, keyboard keys and modifier shortcuts.
 - Disconnecting the session causes the desktop receiver to release held mouse buttons.
+- The Android client now monitors the TLS stream for silent desktop shutdown and closes the session when the companion disappears.
+- The bounded Android event queue fails closed if it saturates, avoiding an input-dispatch crash and ensuring the desktop receives a disconnect.
 
 ## Bluetooth remains independent
 
@@ -27,4 +29,4 @@ The companion is in wifi-companion/. It currently uses Python 3.11+, pynput, cry
 
 ## Release status
 
-This is a release candidate, not hardware-certified. CI validates Android builds/signing and desktop protocol syntax/tests. Before public release, test on Android 16 with a Windows 10/11 host and verify discovery, wrong fingerprint/code rejection, all input gestures, disconnect/reconnect, Bluetooth fallback and a sustained 30-minute session. macOS/Linux require their own smoke tests.
+This is a release candidate, not hardware-certified. CI validates Android builds/signing and desktop protocol syntax/tests, CLI startup, dependency vulnerability audit and protocol edge cases. Before public release, test on Android 16 with a Windows 10/11 host and verify discovery, wrong fingerprint/code rejection, all input gestures, disconnect/reconnect, Bluetooth fallback and a sustained 30-minute session. macOS/Linux require their own smoke tests.

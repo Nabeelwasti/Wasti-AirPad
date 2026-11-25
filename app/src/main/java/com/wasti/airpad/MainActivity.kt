@@ -39,6 +39,9 @@ class MainActivity : Activity() {
     private var hid: BluetoothHidDevice? = null
     private var host: BluetoothDevice? = null
     private var profileRequested = false
+    private var hidRegistered = false
+    private var destroyed = false
+    private var reportFailureShown = false
     private var pendingPermissionAction: (() -> Unit)? = null
     private lateinit var status: TextView
     private lateinit var pad: PadView
@@ -197,6 +200,13 @@ class MainActivity : Activity() {
             profileRequested = true
             val accepted = adapter.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
                 override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (destroyed) {
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, proxy) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
+                        profileRequested = false
+                        return
+                    }
                     val deviceProfile = proxy as? BluetoothHidDevice
                     if (deviceProfile == null) {
                         profileRequested = false
@@ -221,13 +231,19 @@ class MainActivity : Activity() {
                                     pluggedDevice: BluetoothDevice?,
                                     registered: Boolean
                                 ) {
+                                    hidRegistered = registered
+                                    if (!registered) {
+                                        host = null
+                                        if (::pad.isInitialized) pad.releaseLocalState()
+                                    }
                                     setStatus(
                                         if (registered) "Ready. Pair this phone with your computer."
-                                        else "HID registration failed. Check device compatibility."
+                                        else "HID is not registered. Keep AirPad open and retry Bluetooth setup."
                                     )
                                 }
 
                                 override fun onConnectionStateChanged(device: BluetoothDevice, state: Int) {
+                                    if (destroyed) return
                                     if (state == BluetoothProfile.STATE_CONNECTED) {
                                         host = device
                                         setStatus("Connected to ${safeDeviceName(device)}")
@@ -246,6 +262,12 @@ class MainActivity : Activity() {
                             }
                         )
                         if (!registrationAccepted) {
+                            hidRegistered = false
+                            hid = null
+                            profileRequested = false
+                            try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                            catch (_: SecurityException) { }
+                            catch (_: RuntimeException) { }
                             setStatus("Android rejected HID registration. This device may not support HID peripheral mode.")
                         }
                     } catch (security: SecurityException) {
@@ -256,6 +278,8 @@ class MainActivity : Activity() {
                 }
 
                 override fun onServiceDisconnected(profile: Int) {
+                    if (destroyed) return
+                    hidRegistered = false
                     hid = null
                     host = null
                     profileRequested = false
@@ -354,15 +378,31 @@ class MainActivity : Activity() {
         try { device.name?.takeIf { it.isNotBlank() } ?: device.address }
         catch (_: SecurityException) { "Paired device" }
 
-    private fun send(reportId: Int, report: ByteArray) {
-        val target = host ?: return
-        val profile = hid ?: return
-        try {
-            profile.sendReport(target, reportId, report)
+    private fun send(reportId: Int, report: ByteArray): Boolean {
+        if (!hidRegistered) return false
+        val target = host ?: return false
+        val profile = hid ?: return false
+        return try {
+            val accepted = profile.sendReport(target, reportId, report)
+            if (accepted) {
+                reportFailureShown = false
+            } else if (!reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth did not accept an input report. Reconnect to your computer.")
+            }
+            accepted
         } catch (_: SecurityException) {
-            setStatus("Bluetooth permission was revoked.")
+            if (!reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth permission was revoked. Grant Nearby devices access again.")
+            }
+            false
         } catch (_: RuntimeException) {
-            setStatus("Bluetooth report failed. Reconnect to your computer.")
+            if (!reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth report failed. Reconnect to your computer.")
+            }
+            false
         }
     }
 
@@ -371,19 +411,23 @@ class MainActivity : Activity() {
     }
 
     internal fun sendKey(modifiers: Int, keyCode: Int) {
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))) {
+            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        }
     }
 
     internal fun sendCtrlWheel(direction: Int) {
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))
-        sendMouse(0, 0, 0, direction)
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))) {
+            sendMouse(0, 0, 0, direction)
+            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        }
     }
 
     private fun setStatus(message: String) {
-        if (!::status.isInitialized) return
-        runOnUiThread { status.text = message }
+        if (destroyed || !::status.isInitialized) return
+        runOnUiThread {
+            if (!destroyed && ::status.isInitialized) status.text = message
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -391,6 +435,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        destroyed = true
+        hidRegistered = false
+        profileRequested = false
         if (::pad.isInitialized) pad.releaseLocalState()
         try { hid?.unregisterApp() } catch (_: SecurityException) { } catch (_: RuntimeException) { }
         hid?.let { profile ->

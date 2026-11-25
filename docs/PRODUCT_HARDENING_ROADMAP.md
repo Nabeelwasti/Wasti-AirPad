@@ -7,7 +7,7 @@
 
 ## Executive assessment
 
-The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, unit tests, local preferences, click controls, and protected release signing. After the owner corrected the Base64 secret, run [45631031747](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45631031747) successfully decoded and validated the JKS and built/uploaded a release APK. Audit found that the old `jarsigner` check was not suitable for APK v2 signatures (it printed `jar is unsigned` while returning success). The workflow has been corrected to use Android `apksigner`, require v2 verification, and compare the APK certificate fingerprint with the configured keystore alias. Run [45634038228](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45634038228) passed both independent CI jobs. Android `apksigner` confirmed APK Signature Scheme v2 and the signer certificate SHA-256 digest matched the configured JKS alias; the signed APK was uploaded. Physical Bluetooth HID compatibility and longer-duration device testing remain unverified.
+The upgrade branch contains the Android 16 toolchain update, HID lifecycle/report hardening, extracted HID report and gesture-policy modules, unit tests, local preferences, click controls, protected release signing, and an official Gradle 8.13 Wrapper with the published distribution SHA-256 pinned. The signed-release workflow validates strict Base64 input, JKS store password, private-key alias, APK v2 signature, signer certificate identity, and APK alignment; temporary signing files are removed after the job. Run [45634634281](https://github.com/Nabeelwasti/Wasti-AirPad/actions/runs/45634634281) passed both jobs before the latest Wrapper/CI hardening changes. A new full CI run on the current branch head is required to validate those final changes. Physical Bluetooth HID compatibility and longer-duration device testing remain intentionally pending.
 
 This roadmap deliberately separates verified facts from work that requires physical hardware. A green CI build proves that the source compiles and automated tests pass; it does not prove that a phone exposes the HID Device profile or that every desktop accepts the reports.
 
@@ -44,9 +44,9 @@ This roadmap deliberately separates verified facts from work that requires physi
 
 ### P1 — Android platform and build
 
-- The upgrade branch now compiles and targets API 36 using AGP 8.13.2, Kotlin 2.3.0, Gradle 8.13, and JDK 17. The latest CI result is the acceptance check for this coordinated change.
+- The upgrade branch compiles and targets API 36 using AGP 8.13.2, Kotlin 2.3.0, Gradle 8.13, and JDK 17. The official Wrapper pins the Gradle distribution and its published checksum; the next CI run must verify the Wrapper-based build.
 - Preserve minSdk 28 unless a demonstrated technical reason requires changing it.
-- Add the Gradle Wrapper and pin its distribution/checksum so local and CI builds use the same Gradle version.
+- The official Gradle 8.13 Wrapper is now committed, its distribution SHA-256 is pinned, and CI uses `./gradlew`; Gradle's setup action validates the Wrapper JAR.
 - Add dependency verification/version catalogs or documented pinned versions as the project grows.
 - Add static checks for dependency/license inventory and secret leakage.
 - Consider release minification only after adding release smoke checks and validating HID reflection/keep rules (if any).
@@ -79,7 +79,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 ### Phase 1 — Safety and correctness
 - Model Bluetooth/HID states explicitly.
-- Check `sendReport()` results and gate sends on confirmed connection.
+- Check `sendReport()` results, gate sends on confirmed connection, and prevent host connection requests until HID registration is confirmed.
 - Make profile initialization and teardown idempotent and race-safe.
 - Guarantee release of pressed mouse buttons/keys on cancellation, disconnect, pause, and teardown where the host is still reachable.
 - Add comprehensive pure unit tests.
@@ -112,7 +112,7 @@ No third-party source code is copied into this repository by this audit. Before 
 
 | Test | Status |
 | --- | --- |
-| Unit tests / lint / debug and unsigned release CI | Passed in run 45634038228 |
+| Unit tests / lint / debug and unsigned release CI | Passed in run 45634634281 before latest Wrapper/CI changes; final rerun pending |
 | Android phone exposes HID Device profile | Not tested |
 | Pair and connect to Windows 10/11 | Not tested |
 | macOS / Linux host interoperability | Not tested |
@@ -121,7 +121,7 @@ No third-party source code is copied into this repository by this audit. Before 
 | Disconnect/reconnect and Bluetooth toggle | Not tested on hardware |
 | Screen rotation, background/foreground, process death | Not tested on hardware |
 | 30–60 minute continuous session / battery / thermal | Not tested |
-| Signed production release | Passed in run 45634038228: JKS validation, signed build, APK v2 verification, signer certificate match, and signed artifact upload |
+| Signed production release | Passed in run 45634634281 before latest Wrapper/CI changes; final rerun pending |
 
 ## Non-goals unless separately approved
 

@@ -32,6 +32,11 @@ DEFAULT_PORT = 47777
 def ensure_identity():
     APP_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     if CERT_FILE.exists() and KEY_FILE.exists():
+        try:
+            os.chmod(KEY_FILE, 0o600)
+            os.chmod(CERT_FILE, 0o600)
+        except OSError:
+            pass
         return CERT_FILE.read_bytes()
     private_key = ec.generate_private_key(ec.SECP256R1())
     subject = issuer = x509.Name([
@@ -204,7 +209,7 @@ def handle_client(tls_socket, pairing_code, auth_state):
                 if not raw:
                     break
                 apply_input(decode_message(raw), mouse_controller, keyboard_controller, held_buttons)
-        except (OSError, ProtocolError, ValueError) as error:
+        except Exception as error:
             print(f"Input connection closed: {error}", file=sys.stderr)
         finally:
             apply_input({"type": "release"}, mouse_controller, keyboard_controller, held_buttons)
@@ -257,7 +262,17 @@ def main():
                 tls_socket = context.wrap_socket(connection, server_side=True)
                 handle_client(tls_socket, pairing_code, auth_state)
             except (ssl.SSLError, OSError) as error:
+                try:
+                    connection.close()
+                except OSError:
+                    pass
                 print(f"Connection rejected: {error}", file=sys.stderr)
+            except Exception as error:
+                try:
+                    connection.close()
+                except OSError:
+                    pass
+                print(f"Desktop input backend failed: {error}", file=sys.stderr)
     except KeyboardInterrupt:
         print("\nStopping Wasti AirPad companion.")
     finally:

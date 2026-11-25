@@ -7,7 +7,8 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 - Windows, macOS, and Linux desktop input through pynput. Linux Wayland support depends on the desktop/input backend; X11 is the most compatible.
 - TLS 1.2 or newer with a persistent, self-signed host certificate.
 - Certificate SHA-256 pinning in the Android app.
-- An eight-digit pairing code checked by the desktop before input is accepted.
+- An eight-digit pairing code for first-time pairing; after successful pairing, the phone receives a random 256-bit trust token.
+- The phone stores the token encrypted with a non-exportable Android Keystore AES-GCM key. The desktop stores only its SHA-256 hash in ~/.wasti-airpad/trusted-clients.json, never the bearer token.
 - Mouse movement, left/right/middle buttons, wheel, keyboard keys and modifier shortcuts.
 - Input release on disconnect or transport failure.
 - Automatic port selection when the default port is already occupied.
@@ -39,13 +40,14 @@ On macOS/Linux, open a terminal in this folder and run:
 3. Or open AirPad, tap Wi-Fi, then Find computers on this Wi-Fi. Select the computer found; AirPad fills its local IP, port and fingerprint. If discovery is blocked, enter those values manually.
 4. For manual entry, type the eight-digit pairing code and tap Connect. AirPad rejects a certificate fingerprint mismatch.
 
-The certificate and private key are stored in `~/.wasti-airpad/` and reused on later launches. Do not share host-key.pem. To rotate the computer identity, stop the companion and remove that folder; the next launch creates a new certificate and pairing code.
+The certificate, private key and trusted-phone token hashes are stored in `~/.wasti-airpad/` and reused on later launches. Do not share host-key.pem or trusted-clients.json. After the first successful phone pairing, the phone can reconnect without entering the session code again. The phone's token is encrypted by Android Keystore. To revoke every paired phone, run `python host.py --forget-clients` from this folder. On Windows use `.venv\\Scripts\\python.exe host.py --forget-clients`. To rotate the computer identity, stop the companion and remove that folder; the next launch creates a new certificate and pairing code.
 
 ## Security notes
 
 - The receiver listens on its selected port but rejects source addresses outside private, link-local and loopback ranges before TLS authentication. Do not forward that port from your router or expose it to the public internet.
 - TLS certificate pinning protects against a local-network impostor; the pairing code adds a second check.
-- The pairing code changes each time the companion starts. The QR contains this session code, so treat it as a temporary credential and do not share its screenshot. The certificate fingerprint remains stable until the host identity files are removed.
+- The pairing code changes each time the companion starts and is used only for first-time pairing. The QR contains this session code, so treat it as a temporary credential and do not share its screenshot. The certificate fingerprint remains stable until the host identity files are removed.
+- After first pairing, a random 256-bit token authenticates the phone. The token is encrypted on Android with Android Keystore; the desktop stores only the SHA-256 token digest. Use `python host.py --forget-clients` to revoke all paired phones.
 - The receiver accepts only bounded mouse, key, and release messages. It does not provide shell execution, file access, clipboard access, or screen capture.
 - Only allow the firewall prompt on private/trusted networks. Stop the companion when it is not needed.
 - Automatic discovery and QR pairing are implemented. Automatic reconnect, a native desktop tray, signed desktop installers, and physical hardware certification are not yet implemented.

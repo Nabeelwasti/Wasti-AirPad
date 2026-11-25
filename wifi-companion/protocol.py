@@ -1,5 +1,6 @@
 """Dependency-free message validator for the AirPad desktop companion."""
 from __future__ import annotations
+import hashlib
 import hmac
 import json
 import time
@@ -48,6 +49,44 @@ def _integer(value: dict[str, Any], key: str, minimum: int, maximum: int) -> int
     if not minimum <= item <= maximum:
         raise ProtocolError(f"{key} is outside the permitted range.")
     return item
+
+
+def check_trusted_client_token(
+    supplied: str,
+    trusted_hashes: set[str],
+    state: dict,
+    now: float | None = None,
+) -> bool:
+    """Authenticate a 256-bit URL-safe client token without storing it in plaintext."""
+    current = time.monotonic() if now is None else now
+    if current < state.get("locked_until", 0.0):
+        return False
+    candidate = supplied if isinstance(supplied, str) else str(supplied)
+    valid = (
+        candidate.isascii()
+        and len(candidate) == 43
+        and all(char.isalnum() or char in "_-" for char in candidate)
+    )
+    digest = (
+        hashlib.sha256(candidate.encode("ascii")).hexdigest()
+        if valid else "0" * 64
+    )
+    matched = False
+    candidates = trusted_hashes or {"f" * 64}
+    for trusted_hash in candidates:
+        if isinstance(trusted_hash, str) and len(trusted_hash) == 64:
+            matched = hmac.compare_digest(digest, trusted_hash) or matched
+    if valid and matched:
+        state["failures"] = 0
+        state["locked_until"] = 0.0
+        return True
+    failures = int(state.get("failures", 0)) + 1
+    if failures >= 5:
+        state["failures"] = 0
+        state["locked_until"] = current + 60.0
+    else:
+        state["failures"] = failures
+    return False
 
 
 def check_pairing_code(supplied: str, expected: str, state: dict, now: float | None = None) -> bool:

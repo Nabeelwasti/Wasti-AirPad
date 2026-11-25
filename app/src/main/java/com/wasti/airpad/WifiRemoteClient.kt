@@ -16,6 +16,7 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import org.json.JSONObject
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManager
@@ -23,7 +24,8 @@ import javax.net.ssl.X509TrustManager
 
 /** Pinned-certificate TLS transport for the optional desktop companion. */
 internal class WifiRemoteClient(
-    private val onState: (message: String, connected: Boolean) -> Unit
+    private val onState: (message: String, connected: Boolean) -> Unit,
+    private val onPairingToken: (token: String) -> Unit = {}
 ) : Closeable {
     private val executor = ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -56,7 +58,13 @@ internal class WifiRemoteClient(
         }
     }
 
-    fun connect(address: String, port: Int, pairingCode: String, fingerprint: String) {
+    fun connect(
+        address: String,
+        port: Int,
+        pairingCode: String,
+        fingerprint: String,
+        trustedToken: String? = null
+    ) {
         enqueue {
             closeSocket()
             try {
@@ -68,7 +76,12 @@ internal class WifiRemoteClient(
                         resolvedAddress.isLinkLocalAddress ||
                         resolvedAddress.isLoopbackAddress
                 ) { "Use the computer's private local-network IP address, not a public internet address." }
-                require(pairingCode.matches(Regex("[0-9]{8}"))) { "Pairing code must contain 8 digits." }
+                val validTrustedToken = trustedToken?.takeIf {
+                    it.matches(Regex("[A-Za-z0-9_-]{43}"))
+                }
+                require(validTrustedToken != null || pairingCode.matches(Regex("[0-9]{8}"))) {
+                    "Enter the 8-digit pairing code for a new computer."
+                }
                 val expectedFingerprint = fingerprint
                     .filter { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
                     .lowercase()
@@ -128,14 +141,31 @@ internal class WifiRemoteClient(
 
                 val input = BufferedReader(InputStreamReader(connectedSocket.inputStream, Charsets.UTF_8))
                 val output = BufferedWriter(OutputStreamWriter(connectedSocket.outputStream, Charsets.UTF_8))
-                output.write("{\"type\":\"auth\",\"code\":\"$pairingCode\"}\n")
+                val authMessage = if (validTrustedToken != null) {
+                    "{\"type\":\"auth\",\"token\":\"$validTrustedToken\"}"
+                } else {
+                    "{\"type\":\"auth\",\"code\":\"$pairingCode\"}"
+                }
+                output.write(authMessage)
+                output.write("\n")
                 output.flush()
                 val response = input.readLine()
-                if (response != "{\"type\":\"ready\"}") {
-                    connectedSocket.close()
-                    throw SecurityException("The computer rejected pairing. Check the code and try again.")
+                val responseObject = try {
+                    response?.let { JSONObject(it) }
+                } catch (_: Exception) {
+                    null
                 }
-
+                if (responseObject?.optString("type") != "ready") {
+                    connectedSocket.close()
+                    val message = if (validTrustedToken != null) {
+                        "Saved phone trust was rejected. Re-pair using the current code from the computer."
+                    } else {
+                        "The computer rejected pairing. Check the code and try again."
+                    }
+                    throw SecurityException(message)
+                }
+                val newlyIssuedToken = responseObject.optString("token")
+                    .takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
                 connectedSocket.soTimeout = 0
                 val sessionAccepted = synchronized(stateLock) {
                     if (closed || socket !== connectedSocket) false else {
@@ -148,6 +178,7 @@ internal class WifiRemoteClient(
                     connectedSocket.close()
                     return@enqueue
                 }
+                if (newlyIssuedToken != null) onPairingToken(newlyIssuedToken)
                 onState("Connected to computer over Wi-Fi.", true)
 
                 // The desktop sends no application data after its ready response.

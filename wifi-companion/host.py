@@ -33,12 +33,63 @@ def load_input_backend():
         keyboard = keyboard_module
         mouse = mouse_module
 
-from protocol import MAX_MESSAGE_BYTES, ProtocolError, check_pairing_code, decode_message
+from protocol import MAX_MESSAGE_BYTES, ProtocolError, check_pairing_code, check_trusted_client_token, decode_message
 
 APP_DIR = Path.home() / ".wasti-airpad"
 CERT_FILE = APP_DIR / "host-cert.pem"
 KEY_FILE = APP_DIR / "host-key.pem"
+TRUSTED_CLIENTS_FILE = APP_DIR / "trusted-clients.json"
 DEFAULT_PORT = 47777
+
+
+def load_trusted_client_hashes():
+    """Load SHA-256 hashes of paired phone tokens; never store bearer tokens."""
+    if not TRUSTED_CLIENTS_FILE.exists():
+        return set()
+    try:
+        data = json.loads(TRUSTED_CLIENTS_FILE.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("version") != 1:
+            raise ValueError("unsupported trusted-client store format")
+        clients = data.get("clients")
+        if not isinstance(clients, list) or any(
+            not isinstance(item, str) or len(item) != 64
+            or any(char not in "0123456789abcdef" for char in item)
+            for item in clients
+        ):
+            raise ValueError("invalid trusted-client store entries")
+        return set(clients)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise RuntimeError(
+            f"Trusted-client store is invalid; refusing Wi-Fi authentication: {error}"
+        ) from error
+
+
+def save_trusted_client_token(token, trusted_hashes):
+    """Persist only the token digest using an atomic replace."""
+    digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+    updated = set(trusted_hashes)
+    updated.add(digest)
+    APP_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporary = TRUSTED_CLIENTS_FILE.with_name("trusted-clients.tmp")
+    payload = json.dumps({"version": 1, "clients": sorted(updated)}, separators=(",", ":"))
+    temporary.write_text(payload, encoding="utf-8")
+    try:
+        os.chmod(temporary, 0o600)
+    except OSError:
+        pass
+    os.replace(temporary, TRUSTED_CLIENTS_FILE)
+    try:
+        os.chmod(TRUSTED_CLIENTS_FILE, 0o600)
+    except OSError:
+        pass
+    trusted_hashes.add(digest)
+
+
+def forget_all_trusted_clients():
+    try:
+        TRUSTED_CLIENTS_FILE.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def ensure_identity():
@@ -259,7 +310,7 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
                     pass
 
 
-def handle_client(tls_socket, pairing_code, auth_state):
+def handle_client(tls_socket, pairing_code, auth_state, trusted_hashes):
     load_input_backend()
     held_buttons = set()
     mouse_controller = mouse.Controller()
@@ -268,6 +319,7 @@ def handle_client(tls_socket, pairing_code, auth_state):
         tls_socket.settimeout(8)
         stream = tls_socket.makefile("rwb")
         authenticated = False
+        issued_token = None
         if time.monotonic() < auth_state["locked_until"]:
             return
         for _ in range(5):
@@ -278,9 +330,26 @@ def handle_client(tls_socket, pairing_code, auth_state):
                 request = json.loads(raw.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
                 return
-            supplied = request.get("code", "") if isinstance(request, dict) and request.get("type") == "auth" else ""
-            if check_pairing_code(str(supplied), pairing_code, auth_state):
-                authenticated = True
+            if not isinstance(request, dict) or request.get("type") != "auth":
+                return
+
+            supplied_token = request.get("token")
+            if supplied_token is not None:
+                authenticated = check_trusted_client_token(
+                    supplied_token, trusted_hashes, auth_state
+                )
+            else:
+                supplied_code = request.get("code", "")
+                if check_pairing_code(str(supplied_code), pairing_code, auth_state):
+                    issued_token = secrets.token_urlsafe(32)
+                    try:
+                        save_trusted_client_token(issued_token, trusted_hashes)
+                        authenticated = True
+                    except OSError as error:
+                        print(f"Could not persist trusted phone: {error}", file=sys.stderr)
+                        return
+
+            if authenticated:
                 break
             if time.monotonic() < auth_state["locked_until"]:
                 break
@@ -288,7 +357,10 @@ def handle_client(tls_socket, pairing_code, auth_state):
             stream.flush()
         if not authenticated:
             return
-        stream.write(b'{"type":"ready"}\n')
+        response = {"type": "ready"}
+        if issued_token is not None:
+            response["token"] = issued_token
+        stream.write((json.dumps(response, separators=(",", ":")) + "\n").encode("utf-8"))
         stream.flush()
         tls_socket.settimeout(None)
         try:
@@ -306,7 +378,13 @@ def handle_client(tls_socket, pairing_code, auth_state):
 def main():
     parser = argparse.ArgumentParser(description="Wasti AirPad local Wi-Fi desktop companion")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--forget-clients", action="store_true",
+                        help="revoke all previously paired phones, then exit")
     args = parser.parse_args()
+    if args.forget_clients:
+        forget_all_trusted_clients()
+        print("All trusted AirPad phones have been revoked.")
+        return
     if not 0 <= args.port <= 65535:
         parser.error("--port must be 0 (automatic) or between 1 and 65535")
 
@@ -315,6 +393,11 @@ def main():
         x509.load_pem_x509_certificate(cert_bytes).public_bytes(serialization.Encoding.DER)
     ).hexdigest()
     pairing_code = f"{secrets.randbelow(100_000_000):08d}"
+    try:
+        trusted_hashes = load_trusted_client_hashes()
+    except RuntimeError as error:
+        print(error, file=sys.stderr)
+        return
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -348,7 +431,8 @@ def main():
     print("=" * 36)
     print(f"Computer: {socket.gethostname()}")
     print(f"Port: {args.port}")
-    print(f"Pairing code: {pairing_code}")
+    print(f"Pairing code for new phones: {pairing_code}")
+    print(f"Trusted phones: {len(trusted_hashes)} (revoke all with: python host.py --forget-clients)")
     print("Certificate SHA-256 (enter this in AirPad):")
     print(fingerprint)
     print("Local IPv4 addresses:")
@@ -381,7 +465,7 @@ def main():
             try:
                 connection.settimeout(8)
                 tls_socket = context.wrap_socket(connection, server_side=True)
-                handle_client(tls_socket, pairing_code, auth_state)
+                handle_client(tls_socket, pairing_code, auth_state, trusted_hashes)
             except (ssl.SSLError, OSError) as error:
                 try:
                     connection.close()

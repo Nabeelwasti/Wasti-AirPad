@@ -56,8 +56,7 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 
 ## Known limitations — not yet complete
 
-1. **No persistent client identity/token.** The desktop certificate is persistent and pinned, but the Android client still pairs with a session code on each companion launch.
-2. **No automatic reconnect or heartbeat.** Silent desktop shutdown is detected, but recovery requires the user to reconnect.
+1. **No automatic reconnect or heartbeat.** Persistent per-host phone trust is now implemented, and silent desktop shutdown is detected, but recovery still requires the user to reconnect.
 3. **No full text-entry keyboard or on-screen keyboard layout.** Current Wi-Fi keyboard support forwards mapped HID key/shortcut events.
 4. **No media/volume key mode or presentation remote.**
 5. **No clipboard, file transfer, notification sync, screen capture, remote shell, or cloud relay.** Clipboard/file transfer and notifications require separate consent/security designs; shell and unrestricted remote command execution are intentionally excluded.
@@ -76,11 +75,11 @@ The 1.3.0 code line has passed Android unit tests, debug/release lint and builds
 - Add integration tests for desktop connection teardown and event queue saturation where practical.
 
 ### P1 — Pairing and reconnect
-- Add a client identity generated/stored in Android Keystore.
-- Pair once using a short-lived QR invitation and explicit confirmation.
-- Store a host trust record containing host fingerprint, user label, protocol version and last-used timestamp; provide a visible remove/revoke action.
-- Add heartbeat/liveness and bounded exponential reconnect with a visible cancel/disconnect control.
-- Rotate/revoke host identity safely and warn on fingerprint changes.
+- [x] Pair once with an eight-digit code; issue a random 256-bit phone token.
+- [x] Encrypt the phone token with a non-exportable Android Keystore AES-GCM key.
+- [x] Store only SHA-256 token hashes on the desktop; provide a local forget action and a host-side revoke-all command.
+- [x] Keep host certificate pinning and block on fingerprint mismatch.
+- [ ] Add heartbeat/liveness and bounded exponential reconnect with a visible cancel/disconnect control.
 
 ### P1 — Input quality
 - Add a dedicated text-entry panel with clear Send/Cancel semantics; never capture or transmit arbitrary clipboard content automatically.
@@ -140,7 +139,7 @@ Record exact device model, Android version, computer model, host OS/version, com
 - [x] Open-source competitor and architecture research documented.
 - [ ] Physical Android 16 + Windows 10/11 acceptance matrix completed.
 - [ ] macOS/Linux host support verified or explicitly excluded from release claims.
-- [ ] Persistent trust/reconnect roadmap implemented or documented as intentionally deferred.
+- [x] Persistent phone trust and host-side token revocation implemented; automatic reconnect remains deferred.
 - [ ] Project licence chosen by the owner and added before any open-source claim.
 - [ ] Final release tag, signed artifacts, checksums and rollback instructions published.
 

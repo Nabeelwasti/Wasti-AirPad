@@ -11,7 +11,9 @@ Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse an
 - Two-finger pinch gesture for Ctrl+wheel zoom on the host.
 - Right-edge one-finger scrolling.
 - Three- and four-finger shortcuts for supported desktop operating systems.
-- Natural-scroll toggle and touch feedback.
+- Dedicated left- and right-click controls.
+- Adjustable pointer sensitivity and natural-scroll preference saved on the device.
+- Haptic touch feedback.
 
 ## Requirements and compatibility
 
@@ -30,7 +32,8 @@ Android exposes the HID Device profile through the system Bluetooth stack, but n
 4. On the computer, open Bluetooth settings and pair with **Wasti AirPad** (the displayed name may vary by Android version).
 5. Return to AirPad and tap **Connect**.
 6. Select the paired computer. The status line should show the connection state.
-7. Use the touch surface as a trackpad.
+7. Use the touch surface as a trackpad. Dedicated left- and right-click buttons are also available below it.
+8. Adjust pointer sensitivity and natural scrolling; these preferences are saved locally.
 
 If connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing. Returning to AirPad after enabling Bluetooth in Android Settings triggers a fresh HID initialization attempt.
 
@@ -56,13 +59,13 @@ Keyboard shortcuts are designed primarily for Windows hosts. Other operating sys
 
 ## Build from source
 
-The project uses Android Gradle Plugin 8.5.2, Kotlin 1.9.24, Gradle 8.7, and JDK 17.
+The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17, and compiles/targets Android 16 (API 36). The minimum supported Android version remains Android 9 (API 28).
 
-Run: gradle clean testDebugUnitTest lintDebug assembleDebug
+Run: `./gradlew clean testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease` (Windows: `gradlew.bat ...`). The repository includes the official Gradle 8.13 Wrapper and verifies the distribution SHA-256 before use.
 
-The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is generated as app/build/outputs/apk/release/app-release-unsigned.apk and is intentionally unsigned.
+The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is unsigned by default (`app/build/outputs/apk/release/app-release-unsigned.apk`). If all four protected GitHub Actions signing secrets are configured, CI instead produces and uploads `app-release.apk` as the **AirPad-release-signed** artifact.
 
-GitHub Actions runs unit tests, Android lint, and both debug and unsigned release APK builds on pushes to main, pull requests, and manual workflow dispatch. The downloadable workflow artifact is named **AirPad-apk**.
+GitHub Actions validates the Gradle Wrapper, runs unit tests, Android debug/release lint, checks APK alignment and checksums, and builds debug/release APKs on pushes to main, pull requests, and manual workflow dispatch. A separate protected signing job validates the JKS private-key alias, signs the release APK, verifies APK Signature Scheme v2 and certificate identity, and uploads the signed artifact. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
 
 ## Privacy
 
@@ -72,13 +75,16 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 
 - Bluetooth HID peripheral support depends on the Android device manufacturer and firmware.
 - Real pairing, connection stability, mouse movement, scrolling, and shortcut behavior must be validated on the target phone and host computer.
-- The CI artifact is a **debug APK**, not a signed production release. A distributable release requires a securely managed signing key and a release-signing process; never commit a keystore or passwords to this repository.
+- A debug APK is for testing. A signed release requires a privately generated keystore and the protected GitHub Actions secrets documented in [Release signing](docs/RELEASE_SIGNING.md). Never commit or send the keystore/passwords in chat.
 - Gesture recognition can vary with screen size, touch hardware, and host operating system. AirPad releases local drag state when the app loses focus or is paused.
 
 ## Project structure
 
-- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI, Bluetooth HID lifecycle, and touch gestures.
+- app/src/main/java/com/wasti/airpad/MainActivity.kt — UI and Bluetooth HID lifecycle.
+- app/src/main/java/com/wasti/airpad/HidReports.kt — HID descriptor and report encoding.
+- app/src/main/java/com/wasti/airpad/GesturePolicy.kt — deterministic gesture classification thresholds.
 - app/src/main/AndroidManifest.xml — Bluetooth permissions and application declaration.
 - app/build.gradle.kts — Android configuration and unit-test dependency.
-- app/src/test/ — HID report unit tests.
+- app/src/test/ — HID report and gesture policy unit tests.
+- docs/PRODUCT_HARDENING_ROADMAP.md — researched engineering roadmap and hardware acceptance matrix.
 - .github/workflows/build.yml — CI verification and APK artifact workflow.

@@ -24,6 +24,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.WindowInsets
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -39,6 +40,9 @@ class MainActivity : Activity() {
     private var hid: BluetoothHidDevice? = null
     private var host: BluetoothDevice? = null
     private var profileRequested = false
+    private var hidRegistered = false
+    private var destroyed = false
+    private var reportFailureShown = false
     private var pendingPermissionAction: (() -> Unit)? = null
     private lateinit var status: TextView
     private lateinit var pad: PadView
@@ -89,6 +93,7 @@ class MainActivity : Activity() {
         if (::status.isInitialized && hasBluetoothPermissions() && hid == null && !profileRequested) {
             try {
                 if (bluetoothAdapter?.isEnabled == true) initializeHid()
+                else setStatus("Turn on Bluetooth, then return to AirPad.")
             } catch (_: SecurityException) {
                 setStatus("Bluetooth permission is missing.")
             }
@@ -107,10 +112,35 @@ class MainActivity : Activity() {
     }
 
     private fun buildInterface() {
+        window.statusBarColor = Color.rgb(5, 6, 15)
+        window.navigationBarColor = Color.rgb(5, 6, 15)
+        window.decorView.systemUiVisibility = 0
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 6, 15))
             setPadding(dp(12), dp(8), dp(12), dp(12))
+            setOnApplyWindowInsetsListener { view, insets ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val safeInsets = insets.getInsets(
+                        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                    )
+                    view.setPadding(
+                        dp(12) + safeInsets.left,
+                        dp(8) + safeInsets.top,
+                        dp(12) + safeInsets.right,
+                        dp(12) + safeInsets.bottom
+                    )
+                } else {
+                    view.setPadding(
+                        dp(12) + insets.systemWindowInsetLeft,
+                        dp(8) + insets.systemWindowInsetTop,
+                        dp(12) + insets.systemWindowInsetRight,
+                        dp(12) + insets.systemWindowInsetBottom
+                    )
+                }
+                insets
+            }
         }
         status = TextView(this).apply {
             text = "Starting AirPad…"
@@ -119,6 +149,7 @@ class MainActivity : Activity() {
             setPadding(dp(8), dp(12), dp(8), dp(12))
             contentDescription = "Bluetooth connection status"
         }
+        val preferences = getPreferences(MODE_PRIVATE)
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         controls.addView(Button(this).apply {
             text = "Pair mode"
@@ -150,11 +181,13 @@ class MainActivity : Activity() {
         }
         val sensitivity = SeekBar(this).apply {
             max = 100
-            progress = 45
+            progress = preferences.getInt("pointer_sensitivity", 45).coerceIn(0, 100)
+            pad.sensitivity = 0.5f + progress / 40f
             contentDescription = "Pointer sensitivity"
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     pad.sensitivity = 0.5f + progress / 40f
+                    if (fromUser) preferences.edit().putInt("pointer_sensitivity", progress).apply()
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
@@ -163,16 +196,37 @@ class MainActivity : Activity() {
         val naturalScroll = CheckBox(this).apply {
             text = "Natural scrolling"
             setTextColor(Color.WHITE)
-            setOnCheckedChangeListener { _, checked -> pad.naturalScroll = checked }
+            isChecked = preferences.getBoolean("natural_scrolling", false)
+            pad.naturalScroll = isChecked
+            setOnCheckedChangeListener { _, checked ->
+                pad.naturalScroll = checked
+                preferences.edit().putBoolean("natural_scrolling", checked).apply()
+            }
+        }
+
+        val mouseButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            val left = Button(this@MainActivity).apply {
+                text = "Left click"
+                setOnClickListener { sendMouse(1, 0, 0, 0); sendMouse(0, 0, 0, 0) }
+            }
+            val right = Button(this@MainActivity).apply {
+                text = "Right click"
+                setOnClickListener { sendMouse(2, 0, 0, 0); sendMouse(0, 0, 0, 0) }
+            }
+            addView(left, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(right, LinearLayout.LayoutParams(0, dp(44), 1f))
         }
 
         root.addView(status)
         root.addView(controls)
         root.addView(pad, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(mouseButtons)
         root.addView(sensitivityLabel)
         root.addView(sensitivity)
         root.addView(naturalScroll)
         setContentView(root)
+        root.requestApplyInsets()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
@@ -197,8 +251,18 @@ class MainActivity : Activity() {
             profileRequested = true
             val accepted = adapter.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
                 override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (destroyed) {
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, proxy) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
+                        profileRequested = false
+                        return
+                    }
                     val deviceProfile = proxy as? BluetoothHidDevice
                     if (deviceProfile == null) {
+                        try { bluetoothAdapter?.closeProfileProxy(profile, proxy) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         profileRequested = false
                         setStatus("This device does not provide the Bluetooth HID Device profile.")
                         return
@@ -221,24 +285,51 @@ class MainActivity : Activity() {
                                     pluggedDevice: BluetoothDevice?,
                                     registered: Boolean
                                 ) {
+                                    if (destroyed) return
+                                    hidRegistered = registered
+                                    if (!registered) {
+                                        host = null
+                                        if (::pad.isInitialized) pad.releaseLocalState()
+                                        val staleProfile = hid
+                                        hid = null
+                                        profileRequested = false
+                                        if (staleProfile != null) {
+                                            try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, staleProfile) }
+                                            catch (_: SecurityException) { }
+                                            catch (_: RuntimeException) { }
+                                        }
+                                    }
                                     setStatus(
                                         if (registered) "Ready. Pair this phone with your computer."
-                                        else "HID registration failed. Check device compatibility."
+                                        else "HID is not registered. Keep AirPad open and retry Bluetooth setup."
                                     )
                                 }
 
                                 override fun onConnectionStateChanged(device: BluetoothDevice, state: Int) {
-                                    if (state == BluetoothProfile.STATE_CONNECTED) {
-                                        host = device
-                                        setStatus("Connected to ${safeDeviceName(device)}")
-                                    } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                                        if (host?.address == device.address) host = null
-                                        setStatus("Not connected")
-                                        pad.releaseLocalState()
+                                    if (destroyed) return
+                                    when (state) {
+                                        BluetoothProfile.STATE_CONNECTED -> {
+                                            reportFailureShown = false
+                                            host = device
+                                            setStatus("Connected to ${safeDeviceName(device)}")
+                                        }
+                                        BluetoothProfile.STATE_CONNECTING ->
+                                            setStatus("Connecting to ${safeDeviceName(device)}…")
+                                        BluetoothProfile.STATE_DISCONNECTING -> {
+                                            pad.releaseLocalState()
+                                            if (host?.address == device.address) host = null
+                                            setStatus("Disconnecting from ${safeDeviceName(device)}…")
+                                        }
+                                        BluetoothProfile.STATE_DISCONNECTED -> {
+                                            if (host?.address == device.address) host = null
+                                            setStatus("Not connected")
+                                            pad.releaseLocalState()
+                                        }
                                     }
                                 }
 
                                 override fun onVirtualCableUnplug(device: BluetoothDevice) {
+                                    if (destroyed) return
                                     if (host?.address == device.address) host = null
                                     setStatus("Bluetooth host disconnected")
                                     pad.releaseLocalState()
@@ -246,16 +337,36 @@ class MainActivity : Activity() {
                             }
                         )
                         if (!registrationAccepted) {
+                            hidRegistered = false
+                            hid = null
+                            profileRequested = false
+                            try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                            catch (_: SecurityException) { }
+                            catch (_: RuntimeException) { }
                             setStatus("Android rejected HID registration. This device may not support HID peripheral mode.")
                         }
                     } catch (security: SecurityException) {
+                        hidRegistered = false
+                        hid = null
+                        profileRequested = false
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         setStatus("Bluetooth permission is missing. Grant Nearby devices access in Settings.")
                     } catch (error: RuntimeException) {
+                        hidRegistered = false
+                        hid = null
+                        profileRequested = false
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         setStatus("Could not register Bluetooth HID: ${error.localizedMessage ?: "unknown error"}")
                     }
                 }
 
                 override fun onServiceDisconnected(profile: Int) {
+                    if (destroyed) return
+                    hidRegistered = false
                     hid = null
                     host = null
                     profileRequested = false
@@ -331,8 +442,11 @@ class MainActivity : Activity() {
                     val target = devices.getOrNull(index) ?: return@setItems
                     try {
                         val profile = hid
-                        if (profile == null) {
-                            setStatus("Bluetooth HID is still starting. Wait a moment and tap Connect again.")
+                        if (profile == null || !hidRegistered) {
+                            setStatus(
+                                if (profile == null) "Bluetooth HID is still starting. Wait a moment and tap Connect again."
+                                else "Bluetooth HID registration is not ready yet. Wait for the Ready status and try again."
+                            )
                             return@setItems
                         }
                         val accepted = profile.connect(target)
@@ -354,15 +468,29 @@ class MainActivity : Activity() {
         try { device.name?.takeIf { it.isNotBlank() } ?: device.address }
         catch (_: SecurityException) { "Paired device" }
 
-    private fun send(reportId: Int, report: ByteArray) {
-        val target = host ?: return
-        val profile = hid ?: return
-        try {
-            profile.sendReport(target, reportId, report)
+    private fun send(reportId: Int, report: ByteArray): Boolean {
+        if (!hidRegistered) return false
+        val target = host ?: return false
+        val profile = hid ?: return false
+        return try {
+            val accepted = profile.sendReport(target, reportId, report)
+            if (!accepted && !reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth did not accept an input report. Reconnect to your computer.")
+            }
+            accepted
         } catch (_: SecurityException) {
-            setStatus("Bluetooth permission was revoked.")
+            if (!reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth permission was revoked. Grant Nearby devices access again.")
+            }
+            false
         } catch (_: RuntimeException) {
-            setStatus("Bluetooth report failed. Reconnect to your computer.")
+            if (!reportFailureShown) {
+                reportFailureShown = true
+                setStatus("Bluetooth report failed. Reconnect to your computer.")
+            }
+            false
         }
     }
 
@@ -370,20 +498,29 @@ class MainActivity : Activity() {
         send(HidReports.MOUSE_REPORT_ID, HidReports.mouse(buttons, dx, dy, wheel))
     }
 
-    internal fun sendKey(modifiers: Int, keyCode: Int) {
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))
+    internal fun releaseAllInput() {
+        sendMouse(0, 0, 0, 0)
         send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+    }
+
+    internal fun sendKey(modifiers: Int, keyCode: Int) {
+        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))) {
+            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        }
     }
 
     internal fun sendCtrlWheel(direction: Int) {
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))
-        sendMouse(0, 0, 0, direction)
-        send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))) {
+            sendMouse(0, 0, 0, direction)
+            send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
+        }
     }
 
     private fun setStatus(message: String) {
-        if (!::status.isInitialized) return
-        runOnUiThread { status.text = message }
+        if (destroyed || !::status.isInitialized) return
+        runOnUiThread {
+            if (!destroyed && ::status.isInitialized) status.text = message
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -392,6 +529,9 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         if (::pad.isInitialized) pad.releaseLocalState()
+        destroyed = true
+        hidRegistered = false
+        profileRequested = false
         try { hid?.unregisterApp() } catch (_: SecurityException) { } catch (_: RuntimeException) { }
         hid?.let { profile ->
             try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, profile) }
@@ -405,31 +545,6 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_BLUETOOTH_PERMISSIONS = 4102
     }
-}
-
-internal object HidReports {
-    const val MOUSE_REPORT_ID = 1
-    const val KEYBOARD_REPORT_ID = 2
-    const val MOD_LEFT_CTRL = 0x01
-    val EMPTY_KEYBOARD = ByteArray(8)
-
-    val DESCRIPTOR: ByteArray = (
-        "05010902A10185010901A10005091901290315002501950375018102950175058103" +
-        "05010930093109381581257F750895038106C0C0" +
-        "05010906A1018502050719E029E715002501750195088102950175088103" +
-        "95067508150025650507190029658100C0"
-    ).chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-
-    fun mouse(buttons: Int, dx: Int, dy: Int, wheel: Int): ByteArray = byteArrayOf(
-        (buttons and 0x07).toByte(),
-        dx.coerceIn(-127, 127).toByte(),
-        dy.coerceIn(-127, 127).toByte(),
-        wheel.coerceIn(-127, 127).toByte()
-    )
-
-    fun keyboard(modifiers: Int, keyCode: Int): ByteArray = byteArrayOf(
-        (modifiers and 0xFF).toByte(), 0, keyCode.toByte(), 0, 0, 0, 0, 0
-    )
 }
 
 private class PadView(context: android.content.Context) : View(context) {
@@ -486,6 +601,11 @@ private class PadView(context: android.content.Context) : View(context) {
             canvas.drawCircle(trail.x, trail.y, trail.radius, paint)
         }
         if (trails.isNotEmpty()) postInvalidateOnAnimation()
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     private fun haptic() = performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -579,7 +699,7 @@ private class PadView(context: android.content.Context) : View(context) {
                         val currentDistance = pinchDistance(event)
                         val pinchDelta = currentDistance - lastPinchDistance
                         lastPinchDistance = currentDistance
-                        if (abs(pinchDelta) > abs(dy) * 0.65f && abs(pinchDelta) > 1.5f * density) {
+                        if (GesturePolicy.isPinch(pinchDelta, dy, density)) {
                             zoomAccumulator += pinchDelta
                             if (abs(zoomAccumulator) >= 18f * density) {
                                 activity.sendCtrlWheel(if (zoomAccumulator > 0f) 1 else -1)
@@ -597,7 +717,8 @@ private class PadView(context: android.content.Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                val isTap = event.eventTime - downTime < 250L && totalMotion < 24f * density
+                val isTap = GesturePolicy.isTap(event.eventTime - downTime, totalMotion, density)
+                if (isTap) performClick()
                 if (dragging) {
                     activity.sendMouse(0, 0, 0, 0)
                     dragging = false
@@ -609,7 +730,7 @@ private class PadView(context: android.content.Context) : View(context) {
                         3 -> { activity.sendKey(0x08, 0x16); haptic() }
                         4 -> { activity.sendKey(0x08, 0x04); haptic() }
                     }
-                } else if (maxPointers >= 3 && max(abs(gestureX), abs(gestureY)) > 100f * density) {
+                } else if (maxPointers >= 3 && GesturePolicy.isSwipe(gestureX, gestureY, density)) {
                     val horizontal = abs(gestureX) > abs(gestureY)
                     if (maxPointers == 3) {
                         when {
@@ -659,7 +780,9 @@ private class PadView(context: android.content.Context) : View(context) {
     }
 
     fun releaseLocalState() {
-        if (dragging) (context as? MainActivity)?.sendMouse(0, 0, 0, 0)
+        // Send neutral reports even if the local gesture flag was already cleared:
+        // a previous release report may have been rejected by the Bluetooth stack.
+        (context as? MainActivity)?.releaseAllInput()
         dragging = false
         lastTapTime = 0L
         resetGesture()

@@ -25,7 +25,7 @@ class ProtocolTests(unittest.TestCase):
         })
 
     def test_ping_message(self):
-        self.assertEqual(decode_message(b'{"type":"ping"}\\n'), {"type": "ping"})
+        self.assertEqual(decode_message(b'{"type":"ping"}\n'), {"type": "ping"})
 
     def test_release_message(self):
         self.assertEqual(decode_message(b'{"type":"release"}\n'), {"type": "release"})

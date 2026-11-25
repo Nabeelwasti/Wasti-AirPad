@@ -17,15 +17,13 @@ jobs:
   verify:
     name: Test, lint and build APK
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      AIRPAD_SIGNING_CONFIGURED: ${{ secrets.AIRPAD_KEYSTORE_BASE64 != '' && secrets.AIRPAD_KEYSTORE_PASSWORD != '' && secrets.AIRPAD_KEY_ALIAS != '' && secrets.AIRPAD_KEY_PASSWORD != '' }}
+    timeout-minutes: 25
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -35,33 +33,108 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Prepare private release keystore
+      - name: Run unit tests, Android lint and APK builds
+        run: gradle --no-daemon clean testDebugUnitTest lintDebug assembleDebug assembleRelease
+
+      - name: Verify APK outputs and checksums
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirPad-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload unsigned release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirPad-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  signed-release:
+    name: Validate signing key and build signed release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AIRPAD_SIGNING_CONFIGURED: ${{ secrets.AIRPAD_KEYSTORE_BASE64 != '' && secrets.AIRPAD_KEYSTORE_PASSWORD != '' && secrets.AIRPAD_KEY_ALIAS != '' && secrets.AIRPAD_KEY_PASSWORD != '' }}
+    steps:
+      - name: Checkout source
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Validate and prepare private JKS keystore
         if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
         env:
           AIRPAD_KEYSTORE_BASE64: ${{ secrets.AIRPAD_KEYSTORE_BASE64 }}
+          AIRPAD_KEYSTORE_PASSWORD: ${{ secrets.AIRPAD_KEYSTORE_PASSWORD }}
+          AIRPAD_KEY_ALIAS: ${{ secrets.AIRPAD_KEY_ALIAS }}
         run: |
+          set -euo pipefail
           umask 077
-          printf '%s' "$AIRPAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/airpad-release.jks"
-          test -s "$RUNNER_TEMP/airpad-release.jks"
+          normalized="$RUNNER_TEMP/airpad-keystore.base64"
+          keystore="$RUNNER_TEMP/airpad-release.jks"
+          # Accept line-wrapped or URL-safe Base64, but reject any other invalid data.
+          printf '%s' "$AIRPAD_KEYSTORE_BASE64" | tr -d '[:space:]' | tr '_-' '/+' > "$normalized"
+          encoded_length=$(wc -c < "$normalized")
+          if (( encoded_length == 0 || encoded_length % 4 == 1 )); then
+            echo "::error::AIRPAD_KEYSTORE_BASE64 is empty or has an invalid Base64 length. Recreate the secret from the complete base64 output."
+            exit 1
+          fi
+          case $((encoded_length % 4)) in
+            2) printf '==' >> "$normalized" ;;
+            3) printf '=' >> "$normalized" ;;
+          esac
+          if ! base64 --decode "$normalized" > "$keystore"; then
+            rm -f "$keystore"
+            echo "::error::AIRPAD_KEYSTORE_BASE64 contains invalid characters or truncated data. Recreate the secret from the complete Base64 output; do not paste terminal prompts."
+            exit 1
+          fi
+          if [[ ! -s "$keystore" ]]; then
+            echo "::error::Decoded keystore is empty."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$keystore" -storetype JKS -storepass "$AIRPAD_KEYSTORE_PASSWORD" -alias "$AIRPAD_KEY_ALIAS" >/dev/null 2>&1; then
+            rm -f "$keystore"
+            echo "::error::The decoded file is not a readable JKS keystore, or its store password/alias is incorrect. Check the existing secrets without sharing them."
+            exit 1
+          fi
+          echo "Private JKS keystore decoded and validated successfully."
 
-      - name: Run unit tests, Android lint and debug build
+      - name: Build signed release APK
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
         env:
           AIRPAD_KEYSTORE_PATH: ${{ runner.temp }}/airpad-release.jks
           AIRPAD_KEYSTORE_PASSWORD: ${{ secrets.AIRPAD_KEYSTORE_PASSWORD }}
           AIRPAD_KEY_ALIAS: ${{ secrets.AIRPAD_KEY_ALIAS }}
           AIRPAD_KEY_PASSWORD: ${{ secrets.AIRPAD_KEY_PASSWORD }}
-        run: gradle --no-daemon clean testDebugUnitTest lintDebug assembleDebug assembleRelease
+        run: gradle --no-daemon --no-configuration-cache assembleRelease
 
-      - name: Verify APK outputs
+      - name: Verify signed APK and checksum
+        if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
         run: |
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          if [[ "$AIRPAD_SIGNING_CONFIGURED" == "true" ]]; then
-            test -s app/build/outputs/apk/release/app-release.apk
-            sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release.apk
-          else
-            test -s app/build/outputs/apk/release/app-release-unsigned.apk
-            sha256sum app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk
-          fi
+          test -s app/build/outputs/apk/release/app-release.apk
+          jarsigner -verify -strict -certs app/build/outputs/apk/release/app-release.apk
+          sha256sum app/build/outputs/apk/release/app-release.apk
 
       - name: Upload signed release APK
         if: env.AIRPAD_SIGNING_CONFIGURED == 'true'
@@ -72,19 +145,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload unsigned release APK
+      - name: Report unsigned-only configuration
         if: env.AIRPAD_SIGNING_CONFIGURED != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirPad-release-unsigned
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: AirPad-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
+        run: echo "Signing secrets are not fully configured; the verified unsigned release artifact is available from the verify job."

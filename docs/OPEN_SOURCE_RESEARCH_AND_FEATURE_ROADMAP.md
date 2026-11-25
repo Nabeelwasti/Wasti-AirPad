@@ -26,6 +26,7 @@ AirPad 1.3.0 adds:
 - Desktop companion under wifi-companion/.
 - Certificate SHA-256 pinning and code-based authentication.
 - A bounded JSON-lines protocol allowing only mouse, key and release messages.
+- Desktop-side source-address filtering rejects non-local peers before TLS authentication.
 - Python protocol unit tests and a separate CI workflow.
 - DNS-SD/mDNS discovery, with manual IP/port fallback. No cloud service or relay.
 

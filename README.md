@@ -1,6 +1,6 @@
 # Wasti AirPad
 
-Current branch release candidate: **1.3.0**. See [release notes](docs/RELEASE_NOTES_1.3.0.md), [third-party notices](THIRD_PARTY_NOTICES.md), [security policy](SECURITY.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
+Current release-candidate line: **1.3.0**. Bluetooth and local Wi-Fi software checks pass in GitHub Actions; real-device acceptance is still required before public release. See [release notes](docs/RELEASE_NOTES_1.3.0.md), [third-party notices](THIRD_PARTY_NOTICES.md), [security policy](SECURITY.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
 
 Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse and touchpad for a paired computer. The phone presents itself as a Bluetooth HID device; the computer receives standard mouse and keyboard reports without a companion desktop application.
 
@@ -52,7 +52,7 @@ Wi-Fi mode requires the desktop companion because a computer cannot receive ordi
 5. Easiest: scan the companion's QR code with the phone camera and open the Wasti AirPad link. Confirm the computer in AirPad. Or tap **Wi-Fi** → **Find computers on this Wi-Fi** and select the discovered computer. Manual IP entry remains available if discovery is blocked.
 6. If entering details manually, enter the eight-digit pairing code and certificate fingerprint. AirPad verifies the certificate before sending input. Tap **Wi-Fi** again to disconnect; tap **Connect** to return to Bluetooth mode.
 
-Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. Automatic DNS-SD discovery, QR invitation pairing and manual IP fallback are implemented. Background reconnect and signed desktop installers remain future work.
+Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. Automatic DNS-SD discovery, QR invitation pairing, manual IP fallback and automatic port fallback are implemented. Automatic reconnect, a desktop tray app and signed desktop installers remain future work.
 
 ## Gesture reference
 
@@ -76,13 +76,13 @@ Keyboard shortcuts are designed primarily for Windows hosts. Other operating sys
 
 ## Build from source
 
-The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17, and compiles/targets Android 16 (API 36). The minimum supported Android version remains Android 9 (API 28).
+The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.14.8, JDK 17, and compiles/targets Android 16 (API 36). The minimum supported Android version remains Android 9 (API 28).
 
-Run: `./gradlew clean testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease` (Windows: `gradlew.bat ...`). The repository includes the official Gradle 8.13 Wrapper and verifies the distribution SHA-256 before use.
+Run: `./gradlew clean testDebugUnitTest lintDebug lintRelease assembleDebug assembleRelease` (Windows: `gradlew.bat ...`). The repository includes the official Gradle 8.14.8 Wrapper and verifies the distribution SHA-256 before use.
 
 The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is unsigned by default (`app/build/outputs/apk/release/app-release-unsigned.apk`). If all four protected GitHub Actions signing secrets are configured, CI instead produces and uploads `app-release.apk` as the **AirPad-release-signed** artifact.
 
-GitHub Actions validates the Gradle Wrapper, runs unit tests, Android debug/release lint, checks APK alignment and checksums, and builds debug/release APKs on pushes to main, pull requests, and manual workflow dispatch. A separate protected signing job validates the JKS private-key alias, signs the release APK, verifies APK Signature Scheme v2 and certificate identity, and uploads the signed artifact. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
+GitHub Actions validates the Gradle Wrapper, runs Kotlin unit tests, Android debug/release lint, checks APK alignment and checksums, and builds debug/release APKs. A separate Wi-Fi Companion workflow compiles the Python receiver, smoke-tests its CLI, runs protocol tests and audits pinned Python dependencies with pip-audit. A separate protected signing job validates the JKS private-key alias, signs the release APK, verifies APK Signature Scheme v2 and certificate identity, and uploads the signed artifact. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
 
 ## Privacy
 

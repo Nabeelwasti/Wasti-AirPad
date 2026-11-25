@@ -150,7 +150,7 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 14f
             setPadding(dp(8), dp(12), dp(8), dp(12))
-            contentDescription = "Bluetooth connection status"
+            contentDescription = "Connection status"
         }
         val preferences = getPreferences(MODE_PRIVATE)
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -168,6 +168,8 @@ class MainActivity : Activity() {
             text = "Connect"
             contentDescription = "Connect to a paired Bluetooth host"
             setOnClickListener {
+                wifiClient?.close()
+                wifiClient = null
                 withBluetoothPermissions {
                     initializeHid()
                     chooseHost()
@@ -176,8 +178,16 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(0, dp(48), 1f))
         controls.addView(Button(this).apply {
             text = "Wi-Fi"
-            contentDescription = "Connect to a computer using the same Wi-Fi network"
-            setOnClickListener { showWifiConnectDialog() }
+            contentDescription = "Connect or disconnect using the same Wi-Fi network"
+            setOnClickListener {
+                if (wifiClient?.isConnected == true) {
+                    wifiClient?.close()
+                    wifiClient = null
+                    setStatus("Disconnected from Wi-Fi.")
+                } else {
+                    showWifiConnectDialog()
+                }
+            }
         }, LinearLayout.LayoutParams(0, dp(48), 1f))
 
         pad = PadView(this)
@@ -257,7 +267,12 @@ class MainActivity : Activity() {
         val port = field("Port (default 47777)", "wifi_port", InputType.TYPE_CLASS_NUMBER).apply {
             if (text.isNullOrBlank()) setText("47777")
         }
-        val code = field("8-digit pairing code", "wifi_code", InputType.TYPE_CLASS_NUMBER)
+        val code = EditText(this).apply {
+            hint = "8-digit pairing code"
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            contentDescription = hint
+        }
         val fingerprint = field("Certificate SHA-256 fingerprint", "wifi_fingerprint",
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
         form.addView(address)
@@ -287,7 +302,6 @@ class MainActivity : Activity() {
                 preferences.edit()
                     .putString("wifi_address", hostAddress)
                     .putString("wifi_port", hostPort.toString())
-                    .putString("wifi_code", pairingCode)
                     .putString("wifi_fingerprint", certificateFingerprint)
                     .apply()
                 wifiClient?.close()

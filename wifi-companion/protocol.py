@@ -55,7 +55,10 @@ def check_pairing_code(supplied: str, expected: str, state: dict, now: float | N
     current = time.monotonic() if now is None else now
     if current < state.get("locked_until", 0.0):
         return False
-    if hmac.compare_digest(str(supplied), expected):
+    candidate = supplied if isinstance(supplied, str) else str(supplied)
+    if not candidate.isascii() or len(candidate) != 8 or not candidate.isdigit():
+        candidate = ""
+    if hmac.compare_digest(candidate, expected):
         state["failures"] = 0
         state["locked_until"] = 0.0
         return True

@@ -3,8 +3,8 @@
 ## New: local Wi-Fi remote control
 
 - Connect an Android phone and desktop computer on the same trusted local network.
-- Discover a running desktop companion automatically with DNS-SD/mDNS, or enter its local IP manually.
-- Authenticate with an eight-digit pairing code.
+- Discover a running desktop companion automatically with DNS-SD/mDNS, scan a QR invitation, or enter its local IP manually.
+- Authenticate with an eight-digit pairing code. QR pairing opens a confirmation prompt in AirPad; the code is session-scoped and is not saved on the phone.
 - Verify the desktop's TLS certificate using its SHA-256 fingerprint before input is sent.
 - Forward mouse movement, left/right/middle buttons, scrolling, keyboard keys and modifier shortcuts.
 - Disconnecting the session causes the desktop receiver to release held mouse buttons.
@@ -15,7 +15,7 @@ Bluetooth HID remains available without installing the desktop companion. Wi-Fi 
 
 ## Desktop companion
 
-The companion is in wifi-companion/. It currently uses Python 3.10+, pynput, cryptography and zeroconf. Windows quick-start is provided; macOS and Linux require platform-specific permissions and input-backend support. Linux Wayland is not certified.
+The companion is in wifi-companion/. It currently uses Python 3.11+, pynput, cryptography, zeroconf and qrcode. Windows quick-start is provided; macOS and Linux require platform-specific permissions and input-backend support. Linux Wayland is not certified.
 
 ## Security and privacy
 

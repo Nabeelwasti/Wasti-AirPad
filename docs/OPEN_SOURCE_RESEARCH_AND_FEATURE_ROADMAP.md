@@ -1,6 +1,6 @@
 # Wasti AirPad — Open-source research, product gap audit and architecture roadmap
 
-Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.1 RC remains the main-branch baseline. The combined AirPad 1.3.1 release candidate is in PR #12 and adds persistent Wi-Fi trust, heartbeat/reconnect and Bluetooth HID protocol handling.
+Research snapshot: 25 November 2026. This is a curated review of relevant public projects and official platform documentation, not an exhaustive audit of every public repository on GitHub. Repository features and licensing can change; re-check the linked upstream licence and release notes before reusing code or dependencies. AirPad 1.3.0 remains the main-branch baseline. The combined AirPad 1.3.1 release candidate is in PR #12 and adds persistent Wi-Fi trust, heartbeat/reconnect and Bluetooth HID protocol handling.
 
 ## Executive direction
 
@@ -54,7 +54,7 @@ Relevant ideas:
 
 Decision: this is the closest direct feature-equivalent project. AirPad 1.3.1 RC now has persistent per-phone trust, authenticated heartbeat and bounded automatic reconnect, in addition to TLS, QR and discovery. It still lacks Beckon's Noise IK transport, full text keyboard, OS-aware shortcuts, media/volume, presentation, explicit clipboard actions, tray/background controls, native installers and build attestations. The MIT licence permits reuse with its notice preserved, but the Rust desktop server and Noise UDP protocol are not drop-in replacements for AirPad's Python/TLS receiver. A migration would be a deliberate protocol and desktop-architecture project, not a small dependency addition. First prototype a separate interoperability branch with protocol tests; do not replace the current stable Bluetooth HID path.
 
-#### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
+#### Direct competitor gap matrix: Beckon vs AirPad 1.3.1 RC
 
 | Capability | Beckon (public reference) | AirPad 1.3.1 RC (PR #12) |
 |---|---|---|

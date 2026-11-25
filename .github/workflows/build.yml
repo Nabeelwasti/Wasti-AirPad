@@ -104,10 +104,14 @@ jobs:
             2) printf '==' >> "$normalized" ;;
             3) printf '=' >> "$normalized" ;;
           esac
-          if ! base64 --decode "$normalized" > "$keystore"; then
-            rm -f "$keystore"
-            echo "::error::AIRPAD_KEYSTORE_BASE64 contains invalid characters or truncated data. Recreate the secret from the complete Base64 output; do not paste terminal prompts."
-            exit 1
+          if ! base64 --decode "$normalized" > "$keystore" 2>/dev/null; then
+            # A final recovery attempt tolerates stray punctuation, but the decoded
+            # bytes are accepted only if keytool validates the expected JKS and alias.
+            if ! base64 --ignore-garbage --decode "$normalized" > "$keystore" 2>/dev/null; then
+              rm -f "$keystore"
+              echo "::error::AIRPAD_KEYSTORE_BASE64 cannot be decoded. Recreate the secret from the complete Base64 output; do not paste terminal prompts."
+              exit 1
+            fi
           fi
           if [[ ! -s "$keystore" ]]; then
             echo "::error::Decoded keystore is empty."

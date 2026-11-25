@@ -298,6 +298,7 @@ class MainActivity : Activity() {
                                 override fun onConnectionStateChanged(device: BluetoothDevice, state: Int) {
                                     if (destroyed) return
                                     if (state == BluetoothProfile.STATE_CONNECTED) {
+                                        reportFailureShown = false
                                         host = device
                                         setStatus("Connected to ${safeDeviceName(device)}")
                                     } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
@@ -450,9 +451,7 @@ class MainActivity : Activity() {
         val profile = hid ?: return false
         return try {
             val accepted = profile.sendReport(target, reportId, report)
-            if (accepted) {
-                reportFailureShown = false
-            } else if (!reportFailureShown) {
+            if (!accepted && !reportFailureShown) {
                 reportFailureShown = true
                 setStatus("Bluetooth did not accept an input report. Reconnect to your computer.")
             }

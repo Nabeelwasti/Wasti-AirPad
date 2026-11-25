@@ -93,6 +93,7 @@ class MainActivity : Activity() {
         if (::status.isInitialized && hasBluetoothPermissions() && hid == null && !profileRequested) {
             try {
                 if (bluetoothAdapter?.isEnabled == true) initializeHid()
+                else setStatus("Turn on Bluetooth, then return to AirPad.")
             } catch (_: SecurityException) {
                 setStatus("Bluetooth permission is missing.")
             }
@@ -306,14 +307,21 @@ class MainActivity : Activity() {
 
                                 override fun onConnectionStateChanged(device: BluetoothDevice, state: Int) {
                                     if (destroyed) return
-                                    if (state == BluetoothProfile.STATE_CONNECTED) {
-                                        reportFailureShown = false
-                                        host = device
-                                        setStatus("Connected to ${safeDeviceName(device)}")
-                                    } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                                        if (host?.address == device.address) host = null
-                                        setStatus("Not connected")
-                                        pad.releaseLocalState()
+                                    when (state) {
+                                        BluetoothProfile.STATE_CONNECTED -> {
+                                            reportFailureShown = false
+                                            host = device
+                                            setStatus("Connected to ${safeDeviceName(device)}")
+                                        }
+                                        BluetoothProfile.STATE_CONNECTING ->
+                                            setStatus("Connecting to ${safeDeviceName(device)}…")
+                                        BluetoothProfile.STATE_DISCONNECTING ->
+                                            setStatus("Disconnecting from ${safeDeviceName(device)}…")
+                                        BluetoothProfile.STATE_DISCONNECTED -> {
+                                            if (host?.address == device.address) host = null
+                                            setStatus("Not connected")
+                                            pad.releaseLocalState()
+                                        }
                                     }
                                 }
 
@@ -587,6 +595,11 @@ private class PadView(context: android.content.Context) : View(context) {
         if (trails.isNotEmpty()) postInvalidateOnAnimation()
     }
 
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
     private fun haptic() = performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
 
     private fun click(button: Int) {
@@ -697,6 +710,7 @@ private class PadView(context: android.content.Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 val isTap = GesturePolicy.isTap(event.eventTime - downTime, totalMotion, density)
+                if (isTap) performClick()
                 if (dragging) {
                     activity.sendMouse(0, 0, 0, 0)
                     dragging = false

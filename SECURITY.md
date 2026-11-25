@@ -19,7 +19,8 @@ Please do not publish an exploitable vulnerability in a public issue. Use GitHub
 - Users can forget a host in AirPad. To revoke every phone token on the desktop, stop the companion and run python host.py --forget-clients.
 - QR invitations contain the session code and host fingerprint. Treat the QR as a temporary credential; do not share screenshots.
 - The desktop protocol allows only bounded mouse, keyboard and release events. It does not expose a shell, arbitrary command execution, screen capture, clipboard, file access or notification access.
-- The Android outbound event queue is bounded. If it saturates, the connection is closed so the desktop can release held mouse buttons rather than replay stale input.
+- The Android outbound event queue is bounded. If it saturates, stale queued input is discarded and the connection is closed so the desktop can release held mouse buttons rather than replay stale input.
+- An authenticated heartbeat runs every 10 seconds. A 30-second read timeout detects an unresponsive host; Android makes at most five automatic reconnect attempts with bounded exponential backoff. The user can always start a fresh connection.
 - The desktop companion stores its persistent TLS private key and trusted-client token hashes under ~/.wasti-airpad/. Keep that folder private. Removing the host identity rotates the certificate; deleting trusted-clients.json revokes phone tokens.
 
 ## User safety

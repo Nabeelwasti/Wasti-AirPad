@@ -252,6 +252,7 @@ class MainActivity : Activity() {
                                     pluggedDevice: BluetoothDevice?,
                                     registered: Boolean
                                 ) {
+                                    if (destroyed) return
                                     hidRegistered = registered
                                     if (!registered) {
                                         host = null
@@ -284,6 +285,7 @@ class MainActivity : Activity() {
                                 }
 
                                 override fun onVirtualCableUnplug(device: BluetoothDevice) {
+                                    if (destroyed) return
                                     if (host?.address == device.address) host = null
                                     setStatus("Bluetooth host disconnected")
                                     pad.releaseLocalState()
@@ -300,8 +302,20 @@ class MainActivity : Activity() {
                             setStatus("Android rejected HID registration. This device may not support HID peripheral mode.")
                         }
                     } catch (security: SecurityException) {
+                        hidRegistered = false
+                        hid = null
+                        profileRequested = false
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         setStatus("Bluetooth permission is missing. Grant Nearby devices access in Settings.")
                     } catch (error: RuntimeException) {
+                        hidRegistered = false
+                        hid = null
+                        profileRequested = false
+                        try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, deviceProfile) }
+                        catch (_: SecurityException) { }
+                        catch (_: RuntimeException) { }
                         setStatus("Could not register Bluetooth HID: ${error.localizedMessage ?: "unknown error"}")
                     }
                 }

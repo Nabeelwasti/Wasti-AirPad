@@ -47,10 +47,10 @@ Wi-Fi mode requires the desktop companion because a computer cannot receive ordi
 2. Allow it only on **Private networks** if the operating-system firewall asks.
 3. Keep the companion running. It prints the computer's local IPv4 address, port, eight-digit pairing code and certificate SHA-256 fingerprint.
 4. Connect the phone and computer to the same trusted Wi-Fi network. Guest Wi-Fi or router client isolation can block local connections.
-5. In AirPad, tap **Wi-Fi** and enter the local IP, port, pairing code and full certificate fingerprint. Tap **Connect**.
-6. The app verifies the computer's certificate before sending any input. Tap **Wi-Fi** again to disconnect; tap **Connect** to return to Bluetooth mode.
+5. In AirPad, tap **Wi-Fi**, then **Find computers on this Wi-Fi**. Select the discovered computer. If discovery is blocked, enter the local IP, port and fingerprint manually.
+6. Enter the eight-digit pairing code and tap **Connect**. The app verifies the computer's certificate before sending input. Tap **Wi-Fi** again to disconnect; tap **Connect** to return to Bluetooth mode.
 
-Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. The current Wi-Fi implementation uses manual IP entry; automatic discovery, QR pairing, background reconnect and signed desktop installers are still under development and are not promised in this release candidate.
+Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. Automatic DNS-SD discovery and manual IP fallback are implemented. QR pairing, background reconnect and signed desktop installers remain future work.
 
 ## Gesture reference
 

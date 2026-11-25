@@ -31,7 +31,8 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
         fun finish() {
             if (!finished.compareAndSet(false, true)) return
             closeDiscovery()
-            onComplete(hosts.values.toList())
+            val discovered = synchronized(hosts) { hosts.values.toList() }
+            handler.post { onComplete(discovered) }
         }
 
         val discoveryListener = object : NsdManager.DiscoveryListener {

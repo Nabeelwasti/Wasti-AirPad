@@ -1,6 +1,6 @@
 # Wasti AirPad
 
-Current release-candidate line: **1.3.0**. Bluetooth and local Wi-Fi software checks pass in GitHub Actions; real-device acceptance is still required before public release. See [release notes](docs/RELEASE_NOTES_1.3.0.md), [third-party notices](THIRD_PARTY_NOTICES.md), [security policy](SECURITY.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
+Current integrated version: **1.3.1**. Android and Wi-Fi Companion CI passed on the release-candidate commit before merge; real-device acceptance is still required before public release. See [release notes](docs/RELEASE_NOTES_1.3.1.md), [third-party notices](THIRD_PARTY_NOTICES.md), [security policy](SECURITY.md), and the [open-source research roadmap](docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).
 
 Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse and touchpad for a paired computer. The phone presents itself as a Bluetooth HID device; the computer receives standard mouse and keyboard reports without a companion desktop application.
 

@@ -23,10 +23,16 @@ class HidReportsTest {
     }
 
     @Test
-    fun descriptorIsPresentAndContainsBothReportIds() {
+    fun descriptorContainsMouseAndKeyboardReportIdentifiers() {
         val descriptor = HidReports.DESCRIPTOR
-        assertTrue(descriptor.isNotEmpty())
-        assertTrue(descriptor.toList().contains(1.toByte()))
-        assertTrue(descriptor.toList().contains(2.toByte()))
+        assertTrue(descriptor.size > 40)
+        assertTrue(descriptor.containsSequence(byteArrayOf(0x85.toByte(), 0x01)))
+        assertTrue(descriptor.containsSequence(byteArrayOf(0x85.toByte(), 0x02)))
     }
+
+    private fun ByteArray.containsSequence(sequence: ByteArray): Boolean =
+        indices.any { start ->
+            start + sequence.size <= size &&
+                sequence.indices.all { offset -> this[start + offset] == sequence[offset] }
+        }
 }

@@ -417,6 +417,7 @@ internal object HidReports {
 }
 
 private class PadView(context: android.content.Context) : View(context) {
+    private val density = resources.displayMetrics.density
     var sensitivity = 1.625f
     var naturalScroll = false
 
@@ -519,6 +520,7 @@ private class PadView(context: android.content.Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
+                lastTapTime = 0L
                 maxPointers = max(maxPointers, count)
                 lastX = Float.NaN
                 if (count == 2) lastPinchDistance = pinchDistance(event)
@@ -561,9 +563,9 @@ private class PadView(context: android.content.Context) : View(context) {
                         val currentDistance = pinchDistance(event)
                         val pinchDelta = currentDistance - lastPinchDistance
                         lastPinchDistance = currentDistance
-                        if (abs(pinchDelta) > abs(dy) * 0.65f && abs(pinchDelta) > 1.5f) {
+                        if (abs(pinchDelta) > abs(dy) * 0.65f && abs(pinchDelta) > 1.5f * density) {
                             zoomAccumulator += pinchDelta
-                            if (abs(zoomAccumulator) >= 18f) {
+                            if (abs(zoomAccumulator) >= 18f * density) {
                                 activity.sendCtrlWheel(if (zoomAccumulator > 0f) 1 else -1)
                                 zoomAccumulator = 0f
                             }
@@ -579,7 +581,7 @@ private class PadView(context: android.content.Context) : View(context) {
                 return true
             }
             MotionEvent.ACTION_UP -> {
-                val isTap = event.eventTime - downTime < 250L && totalMotion < 24f
+                val isTap = event.eventTime - downTime < 250L && totalMotion < 24f * density
                 if (dragging) {
                     activity.sendMouse(0, 0, 0, 0)
                     dragging = false
@@ -591,7 +593,7 @@ private class PadView(context: android.content.Context) : View(context) {
                         3 -> { activity.sendKey(0x08, 0x16); haptic() }
                         4 -> { activity.sendKey(0x08, 0x04); haptic() }
                     }
-                } else if (maxPointers >= 3 && max(abs(gestureX), abs(gestureY)) > 100f) {
+                } else if (maxPointers >= 3 && max(abs(gestureX), abs(gestureY)) > 100f * density) {
                     val horizontal = abs(gestureX) > abs(gestureY)
                     if (maxPointers == 3) {
                         when {
@@ -623,7 +625,7 @@ private class PadView(context: android.content.Context) : View(context) {
 
     private fun scroll(deltaY: Float) {
         scrollAccumulator += if (naturalScroll) deltaY else -deltaY
-        while (abs(scrollAccumulator) >= 10f) {
+        while (abs(scrollAccumulator) >= 10f * density) {
             val direction = if (scrollAccumulator > 0f) 1 else -1
             (context as? MainActivity)?.sendMouse(0, 0, 0, direction)
             scrollAccumulator -= 10f * direction

@@ -1,0 +1,15 @@
+# Gradle and Android build output
+.gradle/
+**/build/
+local.properties
+
+# IDE and operating system files
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Signing material and local secrets (never commit these)
+*.jks
+*.keystore
+secrets.properties

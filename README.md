@@ -73,7 +73,7 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 - Bluetooth HID peripheral support depends on the Android device manufacturer and firmware.
 - Real pairing, connection stability, mouse movement, scrolling, and shortcut behavior must be validated on the target phone and host computer.
 - The CI artifact is a **debug APK**, not a signed production release. A distributable release requires a securely managed signing key and a release-signing process; never commit a keystore or passwords to this repository.
-- Gesture recognition can vary with screen size, touch hardware, and host operating system.
+- Gesture recognition can vary with screen size, touch hardware, and host operating system. AirPad releases local drag state when the app loses focus or is paused.
 
 ## Project structure
 

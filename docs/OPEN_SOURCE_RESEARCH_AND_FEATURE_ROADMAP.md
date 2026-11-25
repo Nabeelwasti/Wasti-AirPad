@@ -198,3 +198,10 @@ The best route is a dual-transport input tool, not a clone of a full phone-integ
 - Dependabot's Gradle 9.9.2 wrapper PR failed because Android Gradle Plugin 8.13.2 relies on a Gradle internal API removed in Gradle 9.6. Do not accept this wrapper major update alone; upgrade AGP and Gradle together only after a coordinated compatibility migration.
 - Dependabot's AGP 9.5.2 PR failed during dependency resolution because Maven Central returned HTTP 429 (rate limiting), so that run did not prove AGP compatibility. Keep the known-good toolchain until a clean, uncached coordinated test can validate it.
 - Dependabot is configured to ignore major Gradle-wrapper and AGP updates until a deliberate migration is ready. Minor/patch updates remain eligible for CI validation.
+
+
+## Project and dependency licensing audit
+
+- The AirPad repository currently has no top-level LICENSE file. Public visibility does not grant others reuse rights; do not describe the app itself as open source until a project licence is selected and added.
+- The companion's current pip-installed dependencies are pynput (LGPL-3.0), python-zeroconf (LGPL-2.1-or-later), and cryptography (Apache-2.0 OR BSD-3-Clause). See THIRD_PARTY_NOTICES.md and upstream licence files. If these are bundled into a desktop executable later, review LGPL notice and relinking obligations before distribution.
+- No source code was copied from Beckon, Axon, KDE Connect, or Deskflow. They were used as feature/architecture references only.

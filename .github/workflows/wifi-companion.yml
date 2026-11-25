@@ -38,7 +38,8 @@ jobs:
         run: |
           python -m py_compile wifi-companion/host.py wifi-companion/protocol.py
           cd wifi-companion
-          python -c "import cryptography, zeroconf, host, protocol; print('Companion imports OK')"
+          python -c "import cryptography, qrcode, zeroconf, host, protocol; print('Companion imports OK')"
+          python host.py --help
       - name: Audit Python dependencies
         run: pip-audit -r wifi-companion/requirements.txt
       - name: Run protocol unit tests

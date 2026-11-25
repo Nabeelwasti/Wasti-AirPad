@@ -12,6 +12,7 @@ Please do not publish an exploitable vulnerability in a public issue. Use GitHub
 
 - Wi-Fi mode is designed for a trusted private LAN, not the public internet.
 - The Android client accepts only private, link-local or loopback destination addresses.
+- The desktop listener rejects peers outside RFC1918 private, IPv4 link-local/loopback, IPv6 ULA, IPv6 link-local and IPv6 loopback ranges before TLS input processing.
 - The desktop companion uses TLS 1.2 or newer and a self-signed host certificate whose SHA-256 fingerprint is pinned by Android.
 - Pairing requires an eight-digit session code. Five failed attempts trigger a 60-second host lockout.
 - QR invitations contain the session code and host fingerprint. Treat the QR as a temporary credential; do not share screenshots.

@@ -46,7 +46,7 @@ def ensure_identity():
         .serial_number(x509.random_serial_number())
         .not_valid_before(now - timedelta(minutes=2))
         .not_valid_after(now + timedelta(days=3650))
-        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
         .sign(private_key, hashes.SHA256())
     )
     KEY_FILE.write_bytes(private_key.private_bytes(
@@ -163,7 +163,7 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
                     pass
 
 
-def handle_client(tls_socket, pairing_code):
+def handle_client(tls_socket, pairing_code, auth_state):
     held_buttons = set()
     mouse_controller = mouse.Controller()
     keyboard_controller = keyboard.Controller()
@@ -171,6 +171,8 @@ def handle_client(tls_socket, pairing_code):
         tls_socket.settimeout(8)
         stream = tls_socket.makefile("rwb")
         authenticated = False
+        if time.monotonic() < auth_state["locked_until"]:
+            return
         for _ in range(5):
             raw = stream.readline(MAX_MESSAGE_BYTES + 1)
             if not raw or len(raw) > MAX_MESSAGE_BYTES:
@@ -182,6 +184,12 @@ def handle_client(tls_socket, pairing_code):
             supplied = request.get("code", "") if isinstance(request, dict) and request.get("type") == "auth" else ""
             if hmac.compare_digest(str(supplied), pairing_code):
                 authenticated = True
+                auth_state["failures"] = 0
+                break
+            auth_state["failures"] += 1
+            if auth_state["failures"] >= 5:
+                auth_state["failures"] = 0
+                auth_state["locked_until"] = time.monotonic() + 60
                 break
             stream.write(b'{"type":"denied"}\n')
             stream.flush()
@@ -237,6 +245,7 @@ def main():
         print(f"  {address}")
     print("\nAllow the app on Private networks only if Windows Firewall asks.")
     print("Do not forward this port on your router. Stop with Ctrl+C.\n")
+    auth_state = {"failures": 0, "locked_until": 0.0}
     try:
         while True:
             try:
@@ -245,7 +254,7 @@ def main():
                 continue
             try:
                 tls_socket = context.wrap_socket(connection, server_side=True)
-                handle_client(tls_socket, pairing_code)
+                handle_client(tls_socket, pairing_code, auth_state)
             except (ssl.SSLError, OSError) as error:
                 print(f"Connection rejected: {error}", file=sys.stderr)
     except KeyboardInterrupt:

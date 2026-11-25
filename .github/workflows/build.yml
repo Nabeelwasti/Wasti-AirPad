@@ -94,8 +94,9 @@ jobs:
           normalized="$RUNNER_TEMP/airpad-keystore.base64"
           keystore="$RUNNER_TEMP/airpad-release.jks"
           # Accept line-wrapped or URL-safe Base64, but reject any other invalid data.
-          printf '%s' "$AIRPAD_KEYSTORE_BASE64" | tr -d '[:space:]' | tr '_-' '/+' > "$normalized"
+          printf '%s' "$AIRPAD_KEYSTORE_BASE64" | tr -d '[:space:]' | tr '_-' '/+' | sed 's/=*$//' > "$normalized"
           encoded_length=$(wc -c < "$normalized")
+          echo "Normalized Base64 character count: $encoded_length"
           if (( encoded_length == 0 || encoded_length % 4 == 1 )); then
             echo "::error::AIRPAD_KEYSTORE_BASE64 is empty or has an invalid Base64 length. Recreate the secret from the complete base64 output."
             exit 1

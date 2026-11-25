@@ -44,6 +44,22 @@ class ProtocolTests(unittest.TestCase):
         ))
         self.assertEqual(state["failures"], 0)
 
+    def test_pairing_rejects_malformed_code_and_expected_value(self):
+        state = {"failures": 0, "locked_until": 0.0}
+        self.assertFalse(check_pairing_code("1234567", "12345678", state, now=1.0))
+        self.assertFalse(check_pairing_code("12345678", "１２３４５６７８", state, now=2.0))
+        self.assertEqual(state["failures"], 2)
+
+    def test_mouse_message_enforces_all_numeric_bounds(self):
+        invalid_messages = [
+            b'{"type":"mouse","buttons":0,"dx":32768,"dy":0,"wheel":0}\n',
+            b'{"type":"mouse","buttons":0,"dx":0,"dy":-32769,"wheel":0}\n',
+            b'{"type":"mouse","buttons":0,"dx":0,"dy":0,"wheel":128}\n',
+        ]
+        for raw in invalid_messages:
+            with self.subTest(raw=raw), self.assertRaises(ProtocolError):
+                decode_message(raw)
+
     def test_non_ascii_pairing_code_is_rejected_without_crashing(self):
         state = {"failures": 0, "locked_until": 0.0}
         self.assertFalse(check_pairing_code("１２３４５６７８", "12345678", state, now=1.0))

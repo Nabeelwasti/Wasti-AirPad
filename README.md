@@ -84,6 +84,10 @@ The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.
 
 GitHub Actions validates the Gradle Wrapper, runs Kotlin unit tests, Android debug/release lint, checks APK alignment and checksums, and builds debug/release APKs. A separate Wi-Fi Companion workflow compiles the Python receiver, smoke-tests its CLI, runs protocol tests and audits pinned Python dependencies with pip-audit. A separate protected signing job validates the JKS private-key alias, signs the release APK, verifies APK Signature Scheme v2 and certificate identity, and uploads the signed artifact. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
 
+## License status
+
+This repository does not currently contain a top-level project licence. Public visibility on GitHub does not by itself grant permission to reuse, modify, or redistribute the project. The repository owner must choose a licence before calling AirPad open source or accepting third-party code contributions. Third-party dependency notices are separate and do not grant a licence to AirPad itself.
+
 ## Privacy
 
 AirPad does not use an account, analytics SDK, cloud relay or telemetry. Bluetooth input is sent to the paired Bluetooth host. Wi-Fi input is sent only to the local desktop companion over TLS after certificate and pairing-code verification. The desktop companion receives mouse/keyboard events only; it does not provide shell execution, screen capture, file access or clipboard access.

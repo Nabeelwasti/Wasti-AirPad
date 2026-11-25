@@ -11,7 +11,9 @@ Wasti AirPad turns a compatible Android phone into a wireless Bluetooth mouse an
 - Two-finger pinch gesture for Ctrl+wheel zoom on the host.
 - Right-edge one-finger scrolling.
 - Three- and four-finger shortcuts for supported desktop operating systems.
-- Natural-scroll toggle and touch feedback.
+- Dedicated left- and right-click controls.
+- Adjustable pointer sensitivity and natural-scroll preference saved on the device.
+- Haptic touch feedback.
 
 ## Requirements and compatibility
 
@@ -30,7 +32,8 @@ Android exposes the HID Device profile through the system Bluetooth stack, but n
 4. On the computer, open Bluetooth settings and pair with **Wasti AirPad** (the displayed name may vary by Android version).
 5. Return to AirPad and tap **Connect**.
 6. Select the paired computer. The status line should show the connection state.
-7. Use the touch surface as a trackpad.
+7. Use the touch surface as a trackpad. Dedicated left- and right-click buttons are also available below it.
+8. Adjust pointer sensitivity and natural scrolling; these preferences are saved locally.
 
 If connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing. Returning to AirPad after enabling Bluetooth in Android Settings triggers a fresh HID initialization attempt.
 

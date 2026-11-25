@@ -52,7 +52,7 @@ Wi-Fi mode requires the desktop companion because a computer cannot receive ordi
 5. Easiest: scan the companion's QR code with the phone camera and open the Wasti AirPad link. Confirm the computer in AirPad. Or tap **Wi-Fi** → **Find computers on this Wi-Fi** and select the discovered computer. Manual IP entry remains available if discovery is blocked.
 6. If entering details manually, enter the eight-digit pairing code and certificate fingerprint. AirPad verifies the certificate before sending input. Tap **Wi-Fi** again to disconnect; tap **Connect** to return to Bluetooth mode.
 
-Wi-Fi input is encrypted with TLS and certificate-pinned. The pairing code is not saved on the phone. Use a private LAN address only; do not forward the companion port from your router. Automatic DNS-SD discovery, QR invitation pairing, manual IP fallback and automatic port fallback are implemented. Automatic reconnect, a desktop tray app and signed desktop installers remain future work.
+Wi-Fi input is encrypted with TLS and certificate-pinned. The first-pairing code is not saved on the phone. After first pairing, the phone stores a random trust token encrypted with Android Keystore; the desktop stores only its SHA-256 hash. Subsequent connections to that computer do not require the session code. Use a private LAN address only; do not forward the companion port from your router. Automatic DNS-SD discovery, QR invitation pairing, manual IP fallback and automatic port fallback are implemented. Automatic reconnect, a desktop tray app and signed desktop installers remain future work.
 
 ## Gesture reference
 

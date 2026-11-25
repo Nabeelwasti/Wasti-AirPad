@@ -9,7 +9,8 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 - Certificate SHA-256 pinning in the Android app.
 - An eight-digit pairing code checked by the desktop before input is accepted.
 - Mouse movement, left/right/middle buttons, wheel, keyboard keys and modifier shortcuts.
-- Input release on disconnect.
+- Input release on disconnect or transport failure.
+- Automatic port selection when the default port is already occupied.
 - Automatic local desktop discovery using DNS-SD/mDNS, with manual IP entry as a fallback.
 - QR pairing invitation that opens AirPad through a custom app link; the phone asks for confirmation before connecting.
 - No cloud account, analytics, telemetry, or internet relay.
@@ -36,7 +37,7 @@ On macOS/Linux, open a terminal in this folder and run:
 3. Or open AirPad, tap Wi-Fi, then Find computers on this Wi-Fi. Select the computer found; AirPad fills its local IP, port and fingerprint. If discovery is blocked, enter those values manually.
 4. For manual entry, type the eight-digit pairing code and tap Connect. AirPad rejects a certificate fingerprint mismatch.
 
-The certificate and private key are stored in ~/.wasti-airpad/ and reused on later launches. Do not share host-key.pem. To rotate the computer identity, stop the companion and remove that folder; the next launch creates a new certificate and pairing code.
+The certificate and private key are stored in `~/.wasti-airpad/` and reused on later launches. Do not share host-key.pem. To rotate the computer identity, stop the companion and remove that folder; the next launch creates a new certificate and pairing code.
 
 ## Security notes
 
@@ -45,7 +46,7 @@ The certificate and private key are stored in ~/.wasti-airpad/ and reused on lat
 - The pairing code changes each time the companion starts. The QR contains this session code, so treat it as a temporary credential and do not share its screenshot. The certificate fingerprint remains stable until the host identity files are removed.
 - The receiver accepts only bounded mouse, key, and release messages. It does not provide shell execution, file access, clipboard access, or screen capture.
 - Only allow the firewall prompt on private/trusted networks. Stop the companion when it is not needed.
-- This first implementation uses manual IP entry. Automatic discovery, QR pairing, automatic reconnect, signed installers, and physical hardware certification are not yet implemented.
+- Automatic discovery and QR pairing are implemented. Automatic reconnect, a native desktop tray, signed desktop installers, and physical hardware certification are not yet implemented.
 
 
 ## Platform notes

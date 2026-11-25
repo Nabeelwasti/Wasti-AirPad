@@ -244,8 +244,40 @@ class MainActivity : Activity() {
                 text = "Right click"
                 setOnClickListener { sendMouse(2, 0, 0, 0); sendMouse(0, 0, 0, 0) }
             }
+            val test = Button(this@MainActivity).apply {
+                text = "Test HID"
+                contentDescription = "Send a harmless mouse movement and Space key test to the connected computer"
+                setOnClickListener {
+                    if (wifiClient?.isConnected == true) {
+                        setStatus("Disconnect Wi-Fi first to run the Bluetooth HID test.")
+                        return@setOnClickListener
+                    }
+                    if (!hidRegistered || host == null) {
+                        setStatus("Bluetooth HID is not ready. Wait for Ready, connect your computer, then test again.")
+                        return@setOnClickListener
+                    }
+                    val acceptedBefore = acceptedInputReports
+                    val rejectedBefore = rejectedInputReports
+                    sendMouse(0, 24, 0, 0)
+                    sendMouse(0, 0, 0, 0)
+                    sendKey(0, 0x2C)
+                    val accepted = acceptedInputReports - acceptedBefore
+                    val rejected = rejectedInputReports - rejectedBefore
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Bluetooth HID test")
+                        .setMessage(
+                            "Android accepted $accepted of 4 reports and rejected $rejected. " +
+                                "The test also sends a Space key press. Check whether the computer " +
+                                "pointer moves and the key is received. An accepted report means " +
+                                "Android queued it; it does not prove the host processed it."
+                        )
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
             addView(left, LinearLayout.LayoutParams(0, dp(44), 1f))
             addView(right, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(test, LinearLayout.LayoutParams(0, dp(44), 1f))
         }
 
         root.addView(status)
@@ -514,6 +546,8 @@ class MainActivity : Activity() {
                                     when (state) {
                                         BluetoothProfile.STATE_CONNECTED -> {
                                             reportFailureShown = false
+                                            acceptedInputReports = 0
+                                            rejectedInputReports = 0
                                             hidProtocolMode = HidReports.PROTOCOL_REPORT_MODE
                                             host = device
                                             setStatus("Connected to ${safeDeviceName(device)}. HID report mode is active.")
@@ -777,22 +811,20 @@ class MainActivity : Activity() {
                     setStatus("Bluetooth connected. Android accepted HID input reports.")
                 }
             } else {
-                rejectedInputReports++
                 reportRejected("Android rejected HID report ${reportId} (${report.size} bytes). Reconnect the computer.")
             }
             accepted
         } catch (_: SecurityException) {
-            rejectedInputReports++
             reportRejected("Bluetooth permission was revoked. Grant Nearby devices access again.")
             false
         } catch (error: RuntimeException) {
-            rejectedInputReports++
             reportRejected("Bluetooth HID report failed: ${error.localizedMessage ?: "system error"}")
             false
         }
     }
 
     private fun reportRejected(message: String) {
+        rejectedInputReports++
         if (!reportFailureShown) {
             reportFailureShown = true
             setStatus(message)

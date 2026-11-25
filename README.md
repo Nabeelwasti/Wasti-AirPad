@@ -43,7 +43,7 @@ If Bluetooth connection fails, remove the old pairing from both devices, pair ag
 
 Wi-Fi mode requires the desktop companion because a computer cannot receive ordinary Wi-Fi mouse/keyboard events from a phone without a host-side receiver. The companion is in [wifi-companion](wifi-companion/README.md).
 
-1. On the computer, install Python 3.10 or newer and run the companion using the steps in its README (Windows users can double-click wifi-companion/run-windows.bat).
+1. On the computer, install Python 3.11 or newer and run the companion using the steps in its README (Windows users can double-click wifi-companion/run-windows.bat).
 2. Allow it only on **Private networks** if the operating-system firewall asks.
 3. Keep the companion running. It prints the computer's local IPv4 address, port, eight-digit pairing code and certificate SHA-256 fingerprint.
 4. Connect the phone and computer to the same trusted Wi-Fi network. Guest Wi-Fi or router client isolation can block local connections.

@@ -86,7 +86,20 @@ def is_allowed_peer_address(value):
         address = ipaddress.ip_address(value.split("%", 1)[0])
     except (ValueError, AttributeError):
         return False
-    return address.is_private or address.is_link_local or address.is_loopback
+    if address.version == 4:
+        allowed_networks = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("169.254.0.0/16"),
+            ipaddress.ip_network("127.0.0.0/8"),
+        )
+        return any(address in network for network in allowed_networks)
+    return (
+        address.is_loopback
+        or address in ipaddress.ip_network("fc00::/7")
+        or address in ipaddress.ip_network("fe80::/10")
+    )
 
 
 def local_ipv4_addresses():

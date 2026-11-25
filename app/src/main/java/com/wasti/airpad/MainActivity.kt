@@ -113,6 +113,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildInterface()
         withBluetoothPermissions { initializeHid() }
+        handlePairingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePairingIntent(intent)
     }
 
     private fun buildInterface() {
@@ -248,6 +255,51 @@ class MainActivity : Activity() {
         root.requestApplyInsets()
     }
 
+    private fun connectWifi(
+        hostAddress: String,
+        hostPort: Int,
+        pairingCode: String,
+        certificateFingerprint: String
+    ) {
+        getPreferences(MODE_PRIVATE).edit()
+            .putString("wifi_address", hostAddress)
+            .putString("wifi_port", hostPort.toString())
+            .putString("wifi_fingerprint", certificateFingerprint)
+            .apply()
+        wifiClient?.close()
+        lateinit var newClient: WifiRemoteClient
+        newClient = WifiRemoteClient { message, _ ->
+            if (wifiClient === newClient) setStatus(message)
+        }
+        wifiClient = newClient
+        setStatus("Connecting securely to $hostAddress…")
+        newClient.connect(hostAddress, hostPort, pairingCode, certificateFingerprint)
+    }
+
+    private fun handlePairingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "wastiairpad" || data.host != "pair") return
+        intent.data = null
+        val address = data.getQueryParameter("host") ?: return
+        val port = data.getQueryParameter("port")?.toIntOrNull() ?: return
+        val code = data.getQueryParameter("code") ?: return
+        val fingerprint = data.getQueryParameter("fp") ?: return
+        if (port !in 1..65535 || !code.matches(Regex("[0-9]{8}")) ||
+            !fingerprint.matches(Regex("[0-9a-fA-F:]{64,95}"))
+        ) {
+            Toast.makeText(this, "This AirPad pairing QR is invalid.", Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Pair with this computer?")
+            .setMessage("Connect to $address over your local Wi-Fi network? Only continue if you scanned this code from your own computer's AirPad companion.")
+            .setPositiveButton("Connect") { _, _ ->
+                connectWifi(address, port, code, fingerprint)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showWifiConnectDialog() {
         val preferences = getPreferences(MODE_PRIVATE)
         val form = LinearLayout(this).apply {
@@ -334,19 +386,7 @@ class MainActivity : Activity() {
                     Toast.makeText(this, "Enter a valid IP, port, 8-digit code and fingerprint.", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
-                preferences.edit()
-                    .putString("wifi_address", hostAddress)
-                    .putString("wifi_port", hostPort.toString())
-                    .putString("wifi_fingerprint", certificateFingerprint)
-                    .apply()
-                wifiClient?.close()
-                lateinit var newClient: WifiRemoteClient
-                newClient = WifiRemoteClient { message, _ ->
-                    if (wifiClient === newClient) setStatus(message)
-                }
-                wifiClient = newClient
-                setStatus("Connecting securely to $hostAddress…")
-                newClient.connect(hostAddress, hostPort, pairingCode, certificateFingerprint)
+                connectWifi(hostAddress, hostPort, pairingCode, certificateFingerprint)
                 dialog.dismiss()
             }
         }

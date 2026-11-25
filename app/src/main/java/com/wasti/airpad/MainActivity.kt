@@ -42,6 +42,7 @@ class MainActivity : Activity() {
     private var hid: BluetoothHidDevice? = null
     private var host: BluetoothDevice? = null
     private var wifiClient: WifiRemoteClient? = null
+    private var wifiDiscovery: WifiHostDiscovery? = null
     private var profileRequested = false
     private var hidRegistered = false
     private var destroyed = false
@@ -275,6 +276,36 @@ class MainActivity : Activity() {
         }
         val fingerprint = field("Certificate SHA-256 fingerprint", "wifi_fingerprint",
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
+        val discoverButton = Button(this).apply {
+            text = "Find computers on this Wi-Fi"
+            setOnClickListener {
+                wifiDiscovery?.close()
+                val discovery = WifiHostDiscovery(this@MainActivity)
+                wifiDiscovery = discovery
+                Toast.makeText(this@MainActivity, "Searching for AirPad computers…", Toast.LENGTH_SHORT).show()
+                discovery.discover { hosts ->
+                    if (wifiDiscovery !== discovery) return@discover
+                    wifiDiscovery = null
+                    discovery.close()
+                    if (hosts.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "No AirPad computer found. Check the same Wi-Fi network or enter its IP manually.", Toast.LENGTH_LONG).show()
+                    } else {
+                        val labels = hosts.map { "${it.name} — ${it.address}:${it.port}" }.toTypedArray()
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Computers found")
+                            .setItems(labels) { _, index ->
+                                val selected = hosts[index]
+                                address.setText(selected.address)
+                                port.setText(selected.port.toString())
+                                fingerprint.setText(selected.fingerprint)
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                }
+            }
+        }
+        form.addView(discoverButton)
         form.addView(address)
         form.addView(port)
         form.addView(code)
@@ -287,6 +318,10 @@ class MainActivity : Activity() {
             .setPositiveButton("Connect", null)
             .setNegativeButton("Cancel", null)
             .create()
+        dialog.setOnDismissListener {
+            wifiDiscovery?.close()
+            wifiDiscovery = null
+        }
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val hostAddress = address.text.toString().trim()
@@ -651,6 +686,8 @@ class MainActivity : Activity() {
         host = null
         wifiClient?.close()
         wifiClient = null
+        wifiDiscovery?.close()
+        wifiDiscovery = null
         super.onDestroy()
     }
 

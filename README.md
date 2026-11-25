@@ -99,6 +99,7 @@ AirPad does not use an account, analytics SDK, cloud relay or telemetry. Bluetoo
 
 - app/src/main/java/com/wasti/airpad/MainActivity.kt — UI and Bluetooth HID lifecycle plus Wi-Fi transport routing.
 - app/src/main/java/com/wasti/airpad/WifiRemoteClient.kt — pinned TLS local-network client.
+- app/src/main/java/com/wasti/airpad/WifiHostDiscovery.kt — DNS-SD/mDNS desktop discovery and legacy multicast compatibility.
 - wifi-companion/ — Python desktop receiver, bounded input protocol, tests and setup instructions.
 - docs/OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md — competitor research, license notes and product roadmap.
 - app/src/main/java/com/wasti/airpad/HidReports.kt — HID descriptor and report encoding.

@@ -27,8 +27,10 @@ import android.view.MotionEvent
 import android.view.WindowInsets
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.text.InputType
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -39,6 +41,8 @@ import kotlin.math.max
 class MainActivity : Activity() {
     private var hid: BluetoothHidDevice? = null
     private var host: BluetoothDevice? = null
+    private var wifiClient: WifiRemoteClient? = null
+    private var wifiDiscovery: WifiHostDiscovery? = null
     private var profileRequested = false
     private var hidRegistered = false
     private var destroyed = false
@@ -109,6 +113,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildInterface()
         withBluetoothPermissions { initializeHid() }
+        handlePairingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePairingIntent(intent)
     }
 
     private fun buildInterface() {
@@ -147,7 +158,7 @@ class MainActivity : Activity() {
             setTextColor(Color.WHITE)
             textSize = 14f
             setPadding(dp(8), dp(12), dp(8), dp(12))
-            contentDescription = "Bluetooth connection status"
+            contentDescription = "Connection status"
         }
         val preferences = getPreferences(MODE_PRIVATE)
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -165,9 +176,24 @@ class MainActivity : Activity() {
             text = "Connect"
             contentDescription = "Connect to a paired Bluetooth host"
             setOnClickListener {
+                wifiClient?.close()
+                wifiClient = null
                 withBluetoothPermissions {
                     initializeHid()
                     chooseHost()
+                }
+            }
+        }, LinearLayout.LayoutParams(0, dp(48), 1f))
+        controls.addView(Button(this).apply {
+            text = "Wi-Fi"
+            contentDescription = "Connect or disconnect using the same Wi-Fi network"
+            setOnClickListener {
+                if (wifiClient?.isConnected == true) {
+                    wifiClient?.close()
+                    wifiClient = null
+                    setStatus("Disconnected from Wi-Fi.")
+                } else {
+                    showWifiConnectDialog()
                 }
             }
         }, LinearLayout.LayoutParams(0, dp(48), 1f))
@@ -227,6 +253,144 @@ class MainActivity : Activity() {
         root.addView(naturalScroll)
         setContentView(root)
         root.requestApplyInsets()
+    }
+
+    private fun connectWifi(
+        hostAddress: String,
+        hostPort: Int,
+        pairingCode: String,
+        certificateFingerprint: String
+    ) {
+        getPreferences(MODE_PRIVATE).edit()
+            .putString("wifi_address", hostAddress)
+            .putString("wifi_port", hostPort.toString())
+            .putString("wifi_fingerprint", certificateFingerprint)
+            .apply()
+        wifiClient?.close()
+        lateinit var newClient: WifiRemoteClient
+        newClient = WifiRemoteClient { message, _ ->
+            if (wifiClient === newClient) setStatus(message)
+        }
+        wifiClient = newClient
+        setStatus("Connecting securely to $hostAddress…")
+        newClient.connect(hostAddress, hostPort, pairingCode, certificateFingerprint)
+    }
+
+    private fun handlePairingIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "wastiairpad" || data.host != "pair") return
+        intent.data = null
+        val address = data.getQueryParameter("host") ?: return
+        val port = data.getQueryParameter("port")?.toIntOrNull() ?: return
+        val code = data.getQueryParameter("code") ?: return
+        val fingerprint = data.getQueryParameter("fp") ?: return
+        if (port !in 1..65535 || !code.matches(Regex("[0-9]{8}")) ||
+            !fingerprint.matches(Regex("[0-9a-fA-F:]{64,95}"))
+        ) {
+            Toast.makeText(this, "This AirPad pairing QR is invalid.", Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Pair with this computer?")
+            .setMessage("Connect to $address over your local Wi-Fi network? Only continue if you scanned this code from your own computer's AirPad companion.")
+            .setPositiveButton("Connect") { _, _ ->
+                connectWifi(address, port, code, fingerprint)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showWifiConnectDialog() {
+        val preferences = getPreferences(MODE_PRIVATE)
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        fun field(hint: String, key: String, inputType: Int): EditText {
+            return EditText(this).apply {
+                this.hint = hint
+                this.inputType = inputType
+                setSingleLine(true)
+                setText(preferences.getString(key, ""))
+                contentDescription = hint
+            }
+        }
+        val address = field("Computer local IP address", "wifi_address",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        val port = field("Port (default 47777)", "wifi_port", InputType.TYPE_CLASS_NUMBER).apply {
+            if (text.isNullOrBlank()) setText("47777")
+        }
+        val code = EditText(this).apply {
+            hint = "8-digit pairing code"
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            contentDescription = hint
+        }
+        val fingerprint = field("Certificate SHA-256 fingerprint", "wifi_fingerprint",
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
+        val discoverButton = Button(this).apply {
+            text = "Find computers on this Wi-Fi"
+            setOnClickListener {
+                wifiDiscovery?.close()
+                val discovery = WifiHostDiscovery(this@MainActivity)
+                wifiDiscovery = discovery
+                Toast.makeText(this@MainActivity, "Searching for AirPad computers…", Toast.LENGTH_SHORT).show()
+                discovery.discover { hosts ->
+                    if (wifiDiscovery !== discovery) return@discover
+                    wifiDiscovery = null
+                    discovery.close()
+                    if (hosts.isEmpty()) {
+                        Toast.makeText(this@MainActivity, "No AirPad computer found. Check the same Wi-Fi network or enter its IP manually.", Toast.LENGTH_LONG).show()
+                    } else {
+                        val labels = hosts.map { "${it.name} — ${it.address}:${it.port}" }.toTypedArray()
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Computers found")
+                            .setItems(labels) { _, index ->
+                                val selected = hosts[index]
+                                address.setText(selected.address)
+                                port.setText(selected.port.toString())
+                                fingerprint.setText(selected.fingerprint)
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                }
+            }
+        }
+        form.addView(discoverButton)
+        form.addView(address)
+        form.addView(port)
+        form.addView(code)
+        form.addView(fingerprint)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Connect over Wi-Fi")
+            .setMessage("Start the Wasti AirPad desktop companion on your computer first. Enter the local IP, pairing code and certificate fingerprint shown there.")
+            .setView(form)
+            .setPositiveButton("Connect", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+        dialog.setOnDismissListener {
+            wifiDiscovery?.close()
+            wifiDiscovery = null
+        }
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val hostAddress = address.text.toString().trim()
+                val hostPort = port.text.toString().trim().toIntOrNull()
+                val pairingCode = code.text.toString().trim()
+                val certificateFingerprint = fingerprint.text.toString().trim()
+                if (hostAddress.isBlank() || hostPort == null || hostPort !in 1..65535 ||
+                    !pairingCode.matches(Regex("[0-9]{8}")) || certificateFingerprint.isBlank()
+                ) {
+                    Toast.makeText(this, "Enter a valid IP, port, 8-digit code and fingerprint.", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                connectWifi(hostAddress, hostPort, pairingCode, certificateFingerprint)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
@@ -495,21 +659,42 @@ class MainActivity : Activity() {
     }
 
     internal fun sendMouse(buttons: Int, dx: Int, dy: Int, wheel: Int) {
+        val network = wifiClient
+        if (network?.isConnected == true) {
+            network.sendMouse(buttons, dx, dy, wheel)
+            return
+        }
         send(HidReports.MOUSE_REPORT_ID, HidReports.mouse(buttons, dx, dy, wheel))
     }
 
     internal fun releaseAllInput() {
+        val network = wifiClient
+        if (network?.isConnected == true) {
+            network.releaseAll()
+            return
+        }
         sendMouse(0, 0, 0, 0)
         send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
     }
 
     internal fun sendKey(modifiers: Int, keyCode: Int) {
+        val network = wifiClient
+        if (network?.isConnected == true) {
+            network.sendKey(modifiers, keyCode)
+            return
+        }
         if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(modifiers, keyCode))) {
             send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
         }
     }
 
     internal fun sendCtrlWheel(direction: Int) {
+        val network = wifiClient
+        if (network?.isConnected == true) {
+            network.sendKey(HidReports.MOD_LEFT_CTRL, 0)
+            network.sendMouse(0, 0, 0, direction)
+            return
+        }
         if (send(HidReports.KEYBOARD_REPORT_ID, HidReports.keyboard(HidReports.MOD_LEFT_CTRL, 0))) {
             sendMouse(0, 0, 0, direction)
             send(HidReports.KEYBOARD_REPORT_ID, HidReports.EMPTY_KEYBOARD)
@@ -539,6 +724,10 @@ class MainActivity : Activity() {
         }
         hid = null
         host = null
+        wifiClient?.close()
+        wifiClient = null
+        wifiDiscovery?.close()
+        wifiDiscovery = null
         super.onDestroy()
     }
 

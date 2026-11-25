@@ -58,7 +58,7 @@ Do not put these values in repository variables, source files, workflow YAML, pu
 
 ## 4. Verify the signed build
 
-After all four secrets are saved, the next workflow run should upload:
+The Gradle release signing configuration explicitly declares `storeType = "JKS"` to match the keystore format generated above. After all four secrets are saved, trigger a new workflow run (for example, by pushing a commit to the pull-request branch). That run should upload:
 
 - `AirPad-apk` — debug APK for device testing.
 - `AirPad-release-signed` — signed release APK for distribution.

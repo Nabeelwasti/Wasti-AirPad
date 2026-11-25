@@ -8,6 +8,7 @@ The companion installs these packages from PyPI; they are not vendored into this
 
 - **pynput** — GNU Lesser General Public License v3 (LGPL-3.0). Upstream: https://github.com/moses-palmer/pynput
 - **zeroconf** — GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later). Upstream: https://github.com/python-zeroconf/python-zeroconf
+- **qrcode** — BSD 3-Clause. Upstream: https://github.com/lincolnloop/python-qrcode
 - **cryptography** — Apache License 2.0 or BSD 3-Clause (Apache-2.0 OR BSD-3-Clause). Upstream: https://github.com/pyca/cryptography
 
 Users installing through pip receive the packages and their licence files from their respective distributions. If a future desktop release bundles these packages into an executable, include the applicable notices and licence texts and review the LGPL obligations for that packaging model before distribution.

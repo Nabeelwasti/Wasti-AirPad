@@ -141,14 +141,31 @@ internal class WifiRemoteClient(
 
                 val input = BufferedReader(InputStreamReader(connectedSocket.inputStream, Charsets.UTF_8))
                 val output = BufferedWriter(OutputStreamWriter(connectedSocket.outputStream, Charsets.UTF_8))
-                output.write("{\"type\":\"auth\",\"code\":\"$pairingCode\"}\n")
+                val authMessage = if (validTrustedToken != null) {
+                    "{\"type\":\"auth\",\"token\":\"$validTrustedToken\"}"
+                } else {
+                    "{\"type\":\"auth\",\"code\":\"$pairingCode\"}"
+                }
+                output.write(authMessage)
+                output.write("\n")
                 output.flush()
                 val response = input.readLine()
-                if (response != "{\"type\":\"ready\"}") {
-                    connectedSocket.close()
-                    throw SecurityException("The computer rejected pairing. Check the code and try again.")
+                val responseObject = try {
+                    response?.let { JSONObject(it) }
+                } catch (_: Exception) {
+                    null
                 }
-
+                if (responseObject?.optString("type") != "ready") {
+                    connectedSocket.close()
+                    val message = if (validTrustedToken != null) {
+                        "Saved phone trust was rejected. Re-pair using the current code from the computer."
+                    } else {
+                        "The computer rejected pairing. Check the code and try again."
+                    }
+                    throw SecurityException(message)
+                }
+                val newlyIssuedToken = responseObject.optString("token")
+                    .takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
                 connectedSocket.soTimeout = 0
                 val sessionAccepted = synchronized(stateLock) {
                     if (closed || socket !== connectedSocket) false else {

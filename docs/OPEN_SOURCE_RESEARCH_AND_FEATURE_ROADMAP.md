@@ -38,12 +38,14 @@ Licence shown by upstream: MIT.
 Relevant ideas:
 - Native Android app plus desktop tray/console receiver.
 - Bluetooth HID and Wi-Fi transports.
-- Noise IK end-to-end encryption, X25519, ChaCha20-Poly1305 and BLAKE2s.
-- QR pairing with one-time invitation token, persistent host identity and trust-on-first-use fingerprint.
-- Multicast discovery, reconnect/liveness checks, Windows/Linux/macOS native input injection.
-- Loopback protocol and trust-state tests.
+- Noise IK end-to-end encryption (X25519, ChaCha20-Poly1305, BLAKE2s).
+- QR pairing with a five-minute one-time invitation token, persistent host identity, Android Keystore-backed trust and trust-on-first-use fingerprint warnings.
+- Multicast/broadcast discovery, subnet fallback, heartbeat/liveness and automatic reconnect.
+- Full text keyboard, OS-aware shortcuts, media/volume keys, presentation controls, clipboard actions and quick-launch/lock-screen actions.
+- Native desktop tray, start-at-login, signed platform packaging and per-release checksums/build attestations.
+- Windows/Linux/macOS native input injection and protocol/trust tests. Linux Wayland is supported by its native input path.
 
-Decision: use as an architecture and security benchmark. Its MIT licence is permissive, but do not copy code without preserving required copyright/licence notices. AirPad's current TLS pinning approach is a simpler first implementation; a Noise-based protocol is a future hardening option if independently reviewed.
+Decision: this is the closest direct feature-equivalent project. AirPad 1.3.0 has now implemented local Wi-Fi, QR, discovery and TLS, but still lacks persistent client tokens, automatic reconnect, full text keyboard, OS-aware shortcut coverage, media/volume, presentation, clipboard, tray/background service, native installers and release attestations. Because Beckon is MIT-licensed, a future phase should evaluate selective, attributed reuse or a protocol-compatible migration rather than reimplementing every feature. Do not copy code without preserving the MIT copyright and licence notice; run a separate architecture/security review before any port.
 
 #### Direct competitor gap matrix: Beckon vs AirPad 1.3.0
 
@@ -225,3 +227,8 @@ The best route is a dual-transport input tool, not a clone of a full phone-integ
 - The AirPad repository currently has no top-level LICENSE file. Public visibility does not grant others reuse rights; do not describe the app itself as open source until a project licence is selected and added.
 - The companion's current pip-installed dependencies are pynput (LGPL-3.0), python-zeroconf (LGPL-2.1-or-later), and cryptography (Apache-2.0 OR BSD-3-Clause), qrcode (BSD-3-Clause). See THIRD_PARTY_NOTICES.md and upstream licence files. If these are bundled into a desktop executable later, review LGPL notice and relinking obligations before distribution.
 - No source code was copied from Beckon, Axon, KDE Connect, or Deskflow. They were used as feature/architecture references only.
+
+
+### Strategic integration recommendation
+
+The direct comparison shows that Beckon already provides a mature Android + Rust desktop architecture, Noise-based trust, reconnect, media and packaging. If the goal is broad feature parity rather than maintaining a deliberately small remote-input app, the lowest-risk next step is to evaluate a controlled integration or migration from Beckon's MIT-licensed components. Do not merge its entire Android app wholesale: first isolate the protocol, pairing/trust, desktop platform layer and test fixtures, then decide whether to port those modules into AirPad or keep a separately branded companion. Maintain Bluetooth HID as AirPad's serverless fallback. This decision should be made before building a second, incompatible long-term Wi-Fi protocol.

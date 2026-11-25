@@ -60,8 +60,8 @@ def check_pairing_code(supplied: str, expected: str, state: dict, now: float | N
     valid_expected = isinstance(expected, str) and expected.isascii() and len(expected) == 8 and expected.isdigit()
     # Compare fixed-length ASCII buffers so malformed input does not create a
     # length-dependent early exit in compare_digest.
-    candidate_bytes = candidate.encode("ascii") if valid_candidate else b"\\x00" * 8
-    expected_bytes = expected.encode("ascii") if valid_expected else b"\\xff" * 8
+    candidate_bytes = candidate.encode("ascii") if valid_candidate else b"\x00" * 8
+    expected_bytes = expected.encode("ascii") if valid_expected else b"\xff" * 8
     if hmac.compare_digest(candidate_bytes, expected_bytes) and valid_expected:
         state["failures"] = 0
         state["locked_until"] = 0.0

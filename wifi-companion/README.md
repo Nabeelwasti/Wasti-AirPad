@@ -23,12 +23,14 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 4. If Windows Firewall asks, allow AirPad on Private networks only.
 5. Keep the companion window open. It prints the computer's local IPv4 address, actual local port (normally 47777; it selects a free port automatically if busy), eight-digit pairing code, and certificate SHA-256 fingerprint. It also advertises the host on the local network for AirPad discovery and prints a QR pairing code for each private IPv4 address.
 
-If you need to choose a port explicitly, run python host.py --port 0 to let the operating system select one, or python host.py --port 47800 to request a specific port. The selected port is always advertised and included in the QR code.
+If you need to choose a port explicitly, run python host.py --port 0 to let the operating system select one, or python host.py --port 47800 to request a specific port. The selected port is always advertised and included in the QR code. The Windows launcher creates an isolated .venv folder and installs the companion's pinned dependencies there rather than into your global Python environment. On macOS/Linux, the commands above also create an isolated virtual environment. To refresh dependencies later, activate .venv and run python -m pip install -r requirements.txt.
 
 On macOS/Linux, open a terminal in this folder and run:
 
-    python3 -m pip install -r requirements.txt
-    python3 host.py
+    python3 -m venv .venv
+    . .venv/bin/activate
+    python -m pip install -r requirements.txt
+    python host.py
 
 ## Connect from Android
 

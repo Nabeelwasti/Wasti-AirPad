@@ -550,12 +550,13 @@ class MainActivity : Activity() {
                                             reportFailureShown = false
                                             acceptedInputReports = 0
                                             rejectedInputReports = 0
-                                            hidProtocolMode = HidReports.PROTOCOL_REPORT_MODE
                                             host = device
                                             setStatus("Connected to ${safeDeviceName(device)}. HID report mode is active.")
                                         }
-                                        BluetoothProfile.STATE_CONNECTING ->
+                                        BluetoothProfile.STATE_CONNECTING -> {
+                                            hidProtocolMode = HidReports.PROTOCOL_REPORT_MODE
                                             setStatus("Connecting to ${safeDeviceName(device)}…")
+                                        }
                                         BluetoothProfile.STATE_DISCONNECTING -> {
                                             pad.releaseLocalState()
                                             if (host?.address == device.address) host = null

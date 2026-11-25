@@ -63,9 +63,9 @@ The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17
 
 Run: gradle clean testDebugUnitTest lintDebug assembleDebug
 
-The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is generated as app/build/outputs/apk/release/app-release-unsigned.apk and is intentionally unsigned.
+The installable debug APK is generated at app/build/outputs/apk/debug/app-debug.apk. The release build is unsigned by default (`app/build/outputs/apk/release/app-release-unsigned.apk`). If all four protected GitHub Actions signing secrets are configured, CI instead produces and uploads `app-release.apk` as the **AirPad-release-signed** artifact.
 
-GitHub Actions runs unit tests, Android lint, and both debug and unsigned release APK builds on pushes to main, pull requests, and manual workflow dispatch. The downloadable workflow artifact is named **AirPad-apk**.
+GitHub Actions runs unit tests, Android lint, and debug/release APK builds on pushes to main, pull requests, and manual workflow dispatch. The downloadable debug artifact is named **AirPad-apk**. Release artifacts are named **AirPad-release-unsigned** by default or **AirPad-release-signed** when signing secrets are configured.
 
 ## Privacy
 
@@ -75,7 +75,7 @@ AirPad does not need an internet connection, account, analytics SDK, or server. 
 
 - Bluetooth HID peripheral support depends on the Android device manufacturer and firmware.
 - Real pairing, connection stability, mouse movement, scrolling, and shortcut behavior must be validated on the target phone and host computer.
-- The CI artifact is a **debug APK**, not a signed production release. A distributable release requires a securely managed signing key and a release-signing process; never commit a keystore or passwords to this repository.
+- A debug APK is for testing. A signed release requires a privately generated keystore and the protected GitHub Actions secrets documented in [Release signing](docs/RELEASE_SIGNING.md). Never commit or send the keystore/passwords in chat.
 - Gesture recognition can vary with screen size, touch hardware, and host operating system. AirPad releases local drag state when the app loses focus or is paused.
 
 ## Project structure

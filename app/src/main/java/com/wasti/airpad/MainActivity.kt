@@ -534,7 +534,7 @@ class MainActivity : Activity() {
                                 }
 
                                 override fun onSetProtocol(device: BluetoothDevice, protocol: Byte) {
-                                    if (destroyed || host?.address != device.address) return
+                                    if (destroyed || (host != null && host?.address != device.address)) return
                                     if (protocol != HidReports.PROTOCOL_BOOT_MODE &&
                                         protocol != HidReports.PROTOCOL_REPORT_MODE
                                     ) {
@@ -542,7 +542,7 @@ class MainActivity : Activity() {
                                         return
                                     }
                                     hidProtocolMode = protocol
-                                    releaseAllInput()
+                                    if (host?.address == device.address) releaseAllInput()
                                     setStatus(
                                         if (protocol == HidReports.PROTOCOL_BOOT_MODE) {
                                             "Connected. Computer selected standard boot HID mode."

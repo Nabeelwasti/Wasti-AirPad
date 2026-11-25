@@ -24,6 +24,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.WindowInsets
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -110,10 +111,29 @@ class MainActivity : Activity() {
     }
 
     private fun buildInterface() {
+        window.statusBarColor = Color.rgb(5, 6, 15)
+        window.navigationBarColor = Color.rgb(5, 6, 15)
+        window.decorView.systemUiVisibility = 0
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.rgb(5, 6, 15))
             setPadding(dp(12), dp(8), dp(12), dp(12))
+            setOnApplyWindowInsetsListener { view, insets ->
+                val safeInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsets(
+                        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                    )
+                } else {
+                    null
+                }
+                val left = safeInsets?.left ?: insets.systemWindowInsetLeft
+                val top = safeInsets?.top ?: insets.systemWindowInsetTop
+                val right = safeInsets?.right ?: insets.systemWindowInsetRight
+                val bottom = safeInsets?.bottom ?: insets.systemWindowInsetBottom
+                view.setPadding(dp(12) + left, dp(8) + top, dp(12) + right, dp(12) + bottom)
+                insets
+            }
         }
         status = TextView(this).apply {
             text = "Starting AirPad…"
@@ -176,6 +196,7 @@ class MainActivity : Activity() {
         root.addView(sensitivity)
         root.addView(naturalScroll)
         setContentView(root)
+        root.requestApplyInsets()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()

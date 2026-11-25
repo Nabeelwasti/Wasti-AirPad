@@ -235,6 +235,14 @@ class MainActivity : Activity() {
                                     if (!registered) {
                                         host = null
                                         if (::pad.isInitialized) pad.releaseLocalState()
+                                        val staleProfile = hid
+                                        hid = null
+                                        profileRequested = false
+                                        if (staleProfile != null) {
+                                            try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, staleProfile) }
+                                            catch (_: SecurityException) { }
+                                            catch (_: RuntimeException) { }
+                                        }
                                     }
                                     setStatus(
                                         if (registered) "Ready. Pair this phone with your computer."
@@ -435,10 +443,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        if (::pad.isInitialized) pad.releaseLocalState()
         destroyed = true
         hidRegistered = false
         profileRequested = false
-        if (::pad.isInitialized) pad.releaseLocalState()
         try { hid?.unregisterApp() } catch (_: SecurityException) { } catch (_: RuntimeException) { }
         hid?.let { profile ->
             try { bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, profile) }

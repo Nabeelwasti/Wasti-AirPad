@@ -142,6 +142,7 @@ class MainActivity : Activity() {
             setPadding(dp(8), dp(12), dp(8), dp(12))
             contentDescription = "Bluetooth connection status"
         }
+        val preferences = getPreferences(MODE_PRIVATE)
         val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         controls.addView(Button(this).apply {
             text = "Pair mode"
@@ -173,11 +174,13 @@ class MainActivity : Activity() {
         }
         val sensitivity = SeekBar(this).apply {
             max = 100
-            progress = 45
+            progress = preferences.getInt("pointer_sensitivity", 45).coerceIn(0, 100)
+            pad.sensitivity = 0.5f + progress / 40f
             contentDescription = "Pointer sensitivity"
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     pad.sensitivity = 0.5f + progress / 40f
+                    if (fromUser) preferences.edit().putInt("pointer_sensitivity", progress).apply()
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
@@ -186,12 +189,32 @@ class MainActivity : Activity() {
         val naturalScroll = CheckBox(this).apply {
             text = "Natural scrolling"
             setTextColor(Color.WHITE)
-            setOnCheckedChangeListener { _, checked -> pad.naturalScroll = checked }
+            isChecked = preferences.getBoolean("natural_scrolling", false)
+            pad.naturalScroll = isChecked
+            setOnCheckedChangeListener { _, checked ->
+                pad.naturalScroll = checked
+                preferences.edit().putBoolean("natural_scrolling", checked).apply()
+            }
+        }
+
+        val mouseButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            val left = Button(this@MainActivity).apply {
+                text = "Left click"
+                setOnClickListener { sendMouse(1, 0, 0, 0); sendMouse(0, 0, 0, 0) }
+            }
+            val right = Button(this@MainActivity).apply {
+                text = "Right click"
+                setOnClickListener { sendMouse(2, 0, 0, 0); sendMouse(0, 0, 0, 0) }
+            }
+            addView(left, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(right, LinearLayout.LayoutParams(0, dp(44), 1f))
         }
 
         root.addView(status)
         root.addView(controls)
         root.addView(pad, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(mouseButtons)
         root.addView(sensitivityLabel)
         root.addView(sensitivity)
         root.addView(naturalScroll)

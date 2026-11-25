@@ -19,5 +19,6 @@ class WifiReconnectPolicyTest {
         assertNull(WifiReconnectPolicy.delaySeconds(0))
         assertNull(WifiReconnectPolicy.delaySeconds(6))
         assertEquals(5, WifiReconnectPolicy.MAX_ATTEMPTS)
+        assertEquals(60L, WifiReconnectPolicy.STABLE_CONNECTION_RESET_SECONDS)
     }
 }

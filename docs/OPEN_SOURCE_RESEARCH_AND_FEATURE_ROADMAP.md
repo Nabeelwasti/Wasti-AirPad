@@ -127,7 +127,7 @@ Official Android references:
 
 ### Android 17 local-network permission planning
 
-The current app targets API 36. Android's current documentation says local-network protections become mandatory for apps targeting API 37 / Android 17. Direct TCP/UDP and NSD access will require the new ACCESS_LOCAL_NETWORK runtime permission, or a privacy-preserving system NSD picker flow where applicable. Do not add the future permission prematurely to an API 36 build; implement and test the correct migration when targetSdk moves to 37.
+The current app targets API 36. Android's current documentation says local-network protections become mandatory for apps targeting API 37 / Android 17. Direct TCP/UDP and legacy NSD scanning will require ACCESS_LOCAL_NETWORK unless the app uses the system-mediated NSD picker. For AirPad's one-computer selection use case, the preferred migration is DiscoveryRequest.FLAG_SHOW_PICKER with NsdManager.registerServiceInfoCallback, then connect to the user-selected NsdServiceInfo.getHostAddresses() result. Do not add ACCESS_LOCAL_NETWORK prematurely to an API 36 build. If the picker cannot meet a documented core requirement, request the broad permission with a clear user rationale and review current Play policy.
 
 ## Wi-Fi transport design
 

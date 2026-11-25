@@ -125,9 +125,14 @@ No third-party source code is copied into this repository by this audit. Before 
 
 ## Non-goals unless separately approved
 
-- No remote control over the internet or Wi-Fi.
-- No desktop companion agent as a prerequisite for core Bluetooth HID.
+- No remote control over the public internet. Local Wi-Fi control is optional and requires the separate desktop companion.
+- No desktop companion as a prerequisite for Bluetooth HID; Wi-Fi mode may use the optional companion.
 - No silent host commands, keylogging, screen capture, or data collection.
 - No automatic permission bypass or Bluetooth setting changes.
 - No copying GPL/AGPL code into a differently licensed product without deliberate license review.
 - No claiming “perfect”, “certified”, or “production proven” solely from CI success.
+
+
+## Local Wi-Fi mode (feature branch)
+
+A first local-network transport is being developed separately from the Bluetooth HID path. It uses a pinned TLS desktop companion, an eight-digit pairing code, a bounded allow-listed input protocol, and explicit local IP entry. It must pass both CI workflows, a security review, and real Android/desktop network testing before release. Automatic discovery, QR pairing, reconnect, signed desktop installers, and Android 17 local-network permission migration remain follow-up gates. See [Open-source research and feature roadmap](OPEN_SOURCE_RESEARCH_AND_FEATURE_ROADMAP.md).

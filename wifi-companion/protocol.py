@@ -1,5 +1,6 @@
 """Dependency-free message validator for the AirPad desktop companion."""
 from __future__ import annotations
+import hashlib
 import hmac
 import json
 import time
@@ -67,7 +68,7 @@ def check_trusted_client_token(
         and all(char.isalnum() or char in "_-" for char in candidate)
     )
     digest = (
-        __import__("hashlib").sha256(candidate.encode("ascii")).hexdigest()
+        hashlib.sha256(candidate.encode("ascii")).hexdigest()
         if valid else "0" * 64
     )
     matched = False

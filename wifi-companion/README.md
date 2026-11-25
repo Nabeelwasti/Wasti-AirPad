@@ -11,6 +11,7 @@ The desktop companion lets the Android AirPad app control a computer over the sa
 - The phone stores the token encrypted with a non-exportable Android Keystore AES-GCM key. The desktop stores only its SHA-256 hash in ~/.wasti-airpad/trusted-clients.json, never the bearer token.
 - Mouse movement, left/right/middle buttons, wheel, keyboard keys and modifier shortcuts.
 - Input release on disconnect or transport failure.
+- Ten-second authenticated heartbeat and 30-second idle timeout; bounded automatic reconnect with five attempts and exponential backoff.
 - Automatic port selection when the default port is already occupied.
 - Automatic local desktop discovery using DNS-SD/mDNS, with manual IP entry as a fallback.
 - QR pairing invitation that opens AirPad through a custom app link; the phone asks for confirmation before connecting.
@@ -50,7 +51,7 @@ The certificate, private key and trusted-phone token hashes are stored in `~/.wa
 - After first pairing, a random 256-bit token authenticates the phone. The token is encrypted on Android with Android Keystore; the desktop stores only the SHA-256 token digest. Use `python host.py --forget-clients` to revoke all paired phones.
 - The receiver accepts only bounded mouse, key, and release messages. It does not provide shell execution, file access, clipboard access, or screen capture.
 - Only allow the firewall prompt on private/trusted networks. Stop the companion when it is not needed.
-- Automatic discovery and QR pairing are implemented. Automatic reconnect, a native desktop tray, signed desktop installers, and physical hardware certification are not yet implemented.
+- Automatic discovery, QR pairing, persistent trusted-phone pairing, heartbeat and bounded automatic reconnect are implemented. A native desktop tray, signed desktop installers, and physical hardware certification are not yet implemented.
 
 
 ## Platform notes

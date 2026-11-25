@@ -56,7 +56,7 @@ Keyboard shortcuts are designed primarily for Windows hosts. Other operating sys
 
 ## Build from source
 
-The project uses Android Gradle Plugin 8.5.2, Kotlin 1.9.24, Gradle 8.7, and JDK 17.
+The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.0, Gradle 8.13, JDK 17, and compiles/targets Android 16 (API 36). The minimum supported Android version remains Android 9 (API 28).
 
 Run: gradle clean testDebugUnitTest lintDebug assembleDebug
 

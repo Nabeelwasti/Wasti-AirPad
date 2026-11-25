@@ -84,6 +84,22 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::status.isInitialized && hasBluetoothPermissions() && hid == null && !profileRequested) {
+            try {
+                if (bluetoothAdapter?.isEnabled == true) initializeHid()
+            } catch (_: SecurityException) {
+                setStatus("Bluetooth permission is missing.")
+            }
+        }
+    }
+
+    override fun onPause() {
+        if (::pad.isInitialized) pad.releaseLocalState()
+        super.onPause()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildInterface()

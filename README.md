@@ -32,7 +32,7 @@ Android exposes the HID Device profile through the system Bluetooth stack, but n
 6. Select the paired computer. The status line should show the connection state.
 7. Use the touch surface as a trackpad.
 
-If connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing.
+If connection fails, remove the old pairing from both devices, pair again, and retry. Keep AirPad open while testing. Returning to AirPad after enabling Bluetooth in Android Settings triggers a fresh HID initialization attempt.
 
 ## Gesture reference
 

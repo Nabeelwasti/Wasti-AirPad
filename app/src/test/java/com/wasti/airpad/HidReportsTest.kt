@@ -30,6 +30,33 @@ class HidReportsTest {
         assertTrue(descriptor.containsSequence(byteArrayOf(0x85.toByte(), 0x02)))
     }
 
+    @Test
+    fun mouseReportMasksUnsupportedButtonsAndClampsEveryAxis() {
+        val report = HidReports.mouse(buttons = 0xF8 or 0x05, dx = -999, dy = 999, wheel = -999)
+        assertArrayEquals(byteArrayOf(0x05, 0x81.toByte(), 0x7F, 0x81.toByte()), report)
+    }
+
+    @Test
+    fun neutralMouseReportReleasesAllButtonsAndMovement() {
+        assertArrayEquals(byteArrayOf(0, 0, 0, 0), HidReports.mouse(0, 0, 0, 0))
+    }
+
+    @Test
+    fun keyboardReportMasksModifierAndKeyToHidByteRange() {
+        val report = HidReports.keyboard(0x1FF, 0x12B)
+        assertEquals(0xFF, report[0].toInt() and 0xFF)
+        assertEquals(0x2B, report[2].toInt() and 0xFF)
+        assertArrayEquals(byteArrayOf(0, 0, 0, 0, 0, 0), report.copyOfRange(3, 8))
+    }
+
+    @Test
+    fun descriptorContainsExpectedReportIdsAndMouseWheelUsage() {
+        val descriptor = HidReports.DESCRIPTOR
+        assertTrue(descriptor.containsSequence(byteArrayOf(0x85.toByte(), HidReports.MOUSE_REPORT_ID.toByte())))
+        assertTrue(descriptor.containsSequence(byteArrayOf(0x85.toByte(), HidReports.KEYBOARD_REPORT_ID.toByte())))
+        assertTrue(descriptor.containsSequence(byteArrayOf(0x09, 0x38)))
+    }
+
     private fun ByteArray.containsSequence(sequence: ByteArray): Boolean =
         indices.any { start ->
             start + sequence.size <= size &&

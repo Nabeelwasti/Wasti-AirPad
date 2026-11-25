@@ -305,19 +305,19 @@ internal class WifiRemoteClient(
     private fun scheduleReconnect(reason: String) {
         val config = connectionConfig ?: return
         val attempt = synchronized(stateLock) {
-            if (closed || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            if (closed || reconnectAttempts >= WifiReconnectPolicy.MAX_ATTEMPTS) {
                 -1
             } else {
                 reconnectAttempts += 1
                 reconnectAttempts
             }
         }
-        if (attempt < 0) {
+        val delaySeconds = WifiReconnectPolicy.delaySeconds(attempt)
+        if (delaySeconds == null) {
             onState("Wi-Fi disconnected. Automatic reconnect stopped; tap Wi-Fi to try again.", false)
             return
         }
-        val delaySeconds = 1L shl (attempt - 1)
-        onState("$reason Reconnecting in $delaySeconds seconds ($attempt/$MAX_RECONNECT_ATTEMPTS).", false)
+        onState("$reason Reconnecting in $delaySeconds seconds ($attempt/${WifiReconnectPolicy.MAX_ATTEMPTS}).", false)
         reconnectTask?.cancel(false)
         try {
             reconnectTask = scheduler.schedule({
@@ -382,6 +382,5 @@ internal class WifiRemoteClient(
         private const val CONNECT_TIMEOUT_MS = 7_000
         private const val HEARTBEAT_INTERVAL_SECONDS = 10L
         private const val HEARTBEAT_TIMEOUT_MS = 30_000
-        private const val MAX_RECONNECT_ATTEMPTS = 5
     }
 }

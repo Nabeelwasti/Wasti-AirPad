@@ -13,3 +13,10 @@ Thumbs.db
 *.jks
 *.keystore
 secrets.properties
+
+# Python desktop companion generated files
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/

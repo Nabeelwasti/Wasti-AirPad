@@ -224,12 +224,15 @@ def apply_input(message, mouse_controller, keyboard_controller, held_buttons):
             desired.add(mouse.Button.right)
         if message["buttons"] & 4:
             desired.add(mouse.Button.middle)
+        # Update the held-state ledger after each successful OS call. If a
+        # later button operation fails, the connection teardown still knows
+        # which earlier button was pressed and can release it.
         for button in desired - held_buttons:
             mouse_controller.press(button)
-        for button in held_buttons - desired:
+            held_buttons.add(button)
+        for button in tuple(held_buttons - desired):
             mouse_controller.release(button)
-        held_buttons.clear()
-        held_buttons.update(desired)
+            held_buttons.discard(button)
         dx = max(-2048, min(2048, message["dx"]))
         dy = max(-2048, min(2048, message["dy"]))
         if dx or dy:

@@ -10,7 +10,7 @@ Wi-Fi requires two components:
 - Android controller: captures gestures and sends authenticated input events.
 - Desktop companion: receives events and injects native mouse/keyboard input.
 
-The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, and DNS-SD/mDNS host discovery with manual-IP fallback. It is not yet hardware-certified or ready to merge.
+The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, DNS-SD/mDNS host discovery, QR invitation pairing and manual-IP fallback. It is not yet hardware-certified or ready to merge.
 
 ## Current AirPad baseline
 
@@ -95,7 +95,7 @@ These projects reinforce the value of serverless Bluetooth HID: it works with ge
 | Python pynput | Cross-platform desktop mouse/keyboard injection | Used by the initial companion; Wayland support varies |
 | Python cryptography | Host key and self-signed certificate generation | Used by the initial companion |
 | PyInstaller | Package Python companion into desktop executables | Candidate for signed Windows/macOS/Linux release artifacts |
-| ZXing | QR scanning/encoding | Candidate for pairing QR after the manual TLS flow is validated |
+| Python qrcode | BSD-3-Clause QR generation | Prints a session-scoped deep-link invitation; Android camera/QR scanner opens AirPad. No camera permission or scanning SDK is required in AirPad |
 | Noise Protocol Framework | Well-specified authenticated key exchange and encrypted transport patterns | Security benchmark; do not roll a custom cryptographic protocol |
 
 Official Android references:
@@ -127,8 +127,8 @@ The current app targets API 36. Android's current documentation says local-netwo
 2. Keep host key private; protect it with platform-native file permissions/ACLs.
 3. Bind or firewall the listener to trusted private networks only; never instruct users to port-forward it.
 4. Add explicit disconnect and reconnect state, exponential backoff, heartbeat and bounded outbound event queue.
-5. Add automatic discovery without accepting arbitrary unauthenticated devices.
-6. Add QR invitation that contains host identity and a short-lived, one-use token; keep certificate pin verification mandatory.
+5. [x] Add automatic DNS-SD discovery without accepting arbitrary unauthenticated devices.
+6. [x] Add a QR invitation containing host address, certificate fingerprint and a session-scoped pairing code; keep certificate pin verification and an explicit Android confirmation mandatory. The code is valid only while that companion process is running, and is rate-limited.
 7. Persist trusted host identity separately from the short-lived pairing code; support revoke/forget host.
 8. Validate all keyboard/mouse events, maximum rates, frame sizes and protocol versions on both sides.
 9. Release all held input on every disconnect, app pause, server shutdown and protocol error.
@@ -150,7 +150,7 @@ The current app targets API 36. Android's current documentation says local-netwo
 
 ### P1 — high-value usability
 - [x] Automatic desktop discovery with NSD/mDNS and a manual-IP fallback.
-- [ ] QR pairing and one-use invitation token.
+- [x] QR invitation pairing with a session-scoped code and Android confirmation.
 - [ ] Saved trusted computer list with rename, forget and revoke.
 - [ ] Reconnect with bounded exponential backoff and visible connection quality/latency.
 - [ ] Better keyboard mapping, layout-aware text input, media keys and horizontal scrolling.
@@ -203,5 +203,5 @@ The best route is a dual-transport input tool, not a clone of a full phone-integ
 ## Project and dependency licensing audit
 
 - The AirPad repository currently has no top-level LICENSE file. Public visibility does not grant others reuse rights; do not describe the app itself as open source until a project licence is selected and added.
-- The companion's current pip-installed dependencies are pynput (LGPL-3.0), python-zeroconf (LGPL-2.1-or-later), and cryptography (Apache-2.0 OR BSD-3-Clause). See THIRD_PARTY_NOTICES.md and upstream licence files. If these are bundled into a desktop executable later, review LGPL notice and relinking obligations before distribution.
+- The companion's current pip-installed dependencies are pynput (LGPL-3.0), python-zeroconf (LGPL-2.1-or-later), and cryptography (Apache-2.0 OR BSD-3-Clause), qrcode (BSD-3-Clause). See THIRD_PARTY_NOTICES.md and upstream licence files. If these are bundled into a desktop executable later, review LGPL notice and relinking obligations before distribution.
 - No source code was copied from Beckon, Axon, KDE Connect, or Deskflow. They were used as feature/architecture references only.

@@ -666,7 +666,10 @@ class MainActivity : Activity() {
                                     data: ByteArray
                                 ) {
                                     if (destroyed || host?.address != device.address) return
-                                    if (reportId.toInt() == HidReports.KEYBOARD_REPORT_ID && data.size == 1) {
+                                    if ((reportId.toInt() == HidReports.KEYBOARD_REPORT_ID ||
+                                            (hidProtocolMode == HidReports.PROTOCOL_BOOT_MODE && reportId.toInt() == 0)) &&
+                                        data.size == 1
+                                    ) {
                                         keyboardLedState = data[0].toInt() and 0x1F
                                     }
                                 }

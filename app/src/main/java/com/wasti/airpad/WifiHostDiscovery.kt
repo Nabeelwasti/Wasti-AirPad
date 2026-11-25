@@ -3,8 +3,11 @@ package com.wasti.airpad
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.ext.SdkExtensions
 import java.io.Closeable
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
@@ -20,6 +23,8 @@ internal data class WifiDiscoveredHost(
 internal class WifiHostDiscovery(context: Context) : Closeable {
     private val manager = context.applicationContext.getSystemService(NsdManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
+    private val wifiManager = context.applicationContext.getSystemService(WifiManager::class.java)
+    private var multicastLock: WifiManager.MulticastLock? = null
     private var listener: NsdManager.DiscoveryListener? = null
     private var timeout: Runnable? = null
     private val finished = AtomicBoolean(false)
@@ -112,10 +117,22 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
 
         listener = discoveryListener
         try {
+            acquireMulticastLockIfRequired()
             manager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
             timeout = Runnable { finish() }.also { handler.postDelayed(it, DISCOVERY_WINDOW_MS) }
         } catch (_: Exception) {
             finish()
+        }
+    }
+
+    private fun acquireMulticastLockIfRequired() {
+        val requiresManualLock = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            SdkExtensions.getExtensionVersion(Build.VERSION_CODES.TIRAMISU) < 7
+        if (requiresManualLock && multicastLock == null) {
+            multicastLock = wifiManager.createMulticastLock("WastiAirPadNsd").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
         }
     }
 
@@ -126,6 +143,10 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
             try { manager.stopServiceDiscovery(it) } catch (_: Exception) { }
         }
         listener = null
+        multicastLock?.let {
+            try { if (it.isHeld) it.release() } catch (_: Exception) { }
+        }
+        multicastLock = null
     }
 
     override fun close() {

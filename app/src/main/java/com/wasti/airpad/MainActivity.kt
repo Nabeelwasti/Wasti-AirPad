@@ -120,18 +120,24 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(5, 6, 15))
             setPadding(dp(12), dp(8), dp(12), dp(12))
             setOnApplyWindowInsetsListener { view, insets ->
-                val safeInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    insets.getInsets(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val safeInsets = insets.getInsets(
                         WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
                     )
+                    view.setPadding(
+                        dp(12) + safeInsets.left,
+                        dp(8) + safeInsets.top,
+                        dp(12) + safeInsets.right,
+                        dp(12) + safeInsets.bottom
+                    )
                 } else {
-                    null
+                    view.setPadding(
+                        dp(12) + insets.systemWindowInsetLeft,
+                        dp(8) + insets.systemWindowInsetTop,
+                        dp(12) + insets.systemWindowInsetRight,
+                        dp(12) + insets.systemWindowInsetBottom
+                    )
                 }
-                val left = safeInsets?.left ?: insets.systemWindowInsetLeft
-                val top = safeInsets?.top ?: insets.systemWindowInsetTop
-                val right = safeInsets?.right ?: insets.systemWindowInsetRight
-                val bottom = safeInsets?.bottom ?: insets.systemWindowInsetBottom
-                view.setPadding(dp(12) + left, dp(8) + top, dp(12) + right, dp(12) + bottom)
                 insets
             }
         }

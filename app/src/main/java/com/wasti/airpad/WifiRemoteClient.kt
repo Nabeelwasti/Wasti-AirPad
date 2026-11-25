@@ -32,6 +32,7 @@ internal class WifiRemoteClient(
         ThreadPoolExecutor.AbortPolicy()
     )
 
+    private val stateLock = Any()
     @Volatile private var socket: SSLSocket? = null
     @Volatile private var writer: BufferedWriter? = null
     @Volatile var isConnected: Boolean = false
@@ -108,9 +109,14 @@ internal class WifiRemoteClient(
                 val connectedSocket = context.socketFactory.createSocket() as SSLSocket
                 // Publish the socket before network operations so close() can
                 // interrupt connection/handshake work during Activity teardown.
-                socket = connectedSocket
-                if (closed) {
-                    closeSocket()
+                val socketAccepted = synchronized(stateLock) {
+                    if (closed) false else {
+                        socket = connectedSocket
+                        true
+                    }
+                }
+                if (!socketAccepted) {
+                    connectedSocket.close()
                     return@enqueue
                 }
                 connectedSocket.soTimeout = 7000
@@ -125,19 +131,23 @@ internal class WifiRemoteClient(
                 output.write("{\"type\":\"auth\",\"code\":\"$pairingCode\"}\n")
                 output.flush()
                 val response = input.readLine()
-                if (closed) {
-                    closeSocket()
-                    return@enqueue
-                }
                 if (response != "{\"type\":\"ready\"}") {
                     connectedSocket.close()
                     throw SecurityException("The computer rejected pairing. Check the code and try again.")
                 }
 
                 connectedSocket.soTimeout = 0
-                socket = connectedSocket
-                writer = output
-                isConnected = true
+                val sessionAccepted = synchronized(stateLock) {
+                    if (closed || socket !== connectedSocket) false else {
+                        writer = output
+                        isConnected = true
+                        true
+                    }
+                }
+                if (!sessionAccepted) {
+                    connectedSocket.close()
+                    return@enqueue
+                }
                 onState("Connected to computer over Wi-Fi.", true)
 
                 // The desktop sends no application data after its ready response.
@@ -197,14 +207,17 @@ internal class WifiRemoteClient(
     }
 
     private fun closeSocket() {
-        isConnected = false
-        writer = null
-        try { socket?.close() } catch (_: Exception) { }
-        socket = null
+        synchronized(stateLock) {
+            isConnected = false
+            writer = null
+            val activeSocket = socket
+            socket = null
+            try { activeSocket?.close() } catch (_: Exception) { }
+        }
     }
 
     override fun close() {
-        closed = true
+        synchronized(stateLock) { closed = true }
         closeSocket()
         executor.shutdownNow()
     }

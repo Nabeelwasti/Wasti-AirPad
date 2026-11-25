@@ -10,7 +10,7 @@ Wi-Fi requires two components:
 - Android controller: captures gestures and sends authenticated input events.
 - Desktop companion: receives events and injects native mouse/keyboard input.
 
-The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, and a Python desktop receiver. It currently requires manual local-IP entry. It is not yet hardware-certified or ready to merge.
+The initial Wi-Fi implementation is on the feature branch and uses TLS with certificate pinning, an eight-digit pairing code, bounded allow-listed input messages, a Python desktop receiver, and DNS-SD/mDNS host discovery with manual-IP fallback. It is not yet hardware-certified or ready to merge.
 
 ## Current AirPad baseline
 
@@ -27,7 +27,7 @@ Current feature branch adds:
 - Certificate SHA-256 pinning and code-based authentication.
 - A bounded JSON-lines protocol allowing only mouse, key and release messages.
 - Python protocol unit tests and a separate CI workflow.
-- Manual IP/port entry. No cloud service or relay.
+- DNS-SD/mDNS discovery, with manual IP/port fallback. No cloud service or relay.
 
 ## Competitive and open-source scan
 
@@ -149,7 +149,7 @@ The current app targets API 36. Android's current documentation says local-netwo
 - [ ] Complete threat model and dependency/license inventory before public release.
 
 ### P1 — high-value usability
-- [ ] Automatic desktop discovery with NSD/mDNS and a manual-IP fallback.
+- [x] Automatic desktop discovery with NSD/mDNS and a manual-IP fallback.
 - [ ] QR pairing and one-use invitation token.
 - [ ] Saved trusted computer list with rename, forget and revoke.
 - [ ] Reconnect with bounded exponential backoff and visible connection quality/latency.
@@ -190,3 +190,11 @@ The current app targets API 36. Android's current documentation says local-netwo
 ## Research conclusion
 
 The best route is a dual-transport input tool, not a clone of a full phone-integration suite. Keep Bluetooth HID serverless; make Wi-Fi secure, easy to discover, and cross-platform through a small desktop companion. Prioritize trust, input correctness, reconnect behavior and release packaging before clipboard, notifications or other feature expansion.
+
+
+## Build dependency update audit
+
+- Kotlin Android Gradle plugin 2.4.21 was tested independently against the current Android build and both CI jobs passed in run 45639469349. The version is included in the Wi-Fi branch so the full feature build will validate it again.
+- Dependabot's Gradle 9.9.2 wrapper PR failed because Android Gradle Plugin 8.13.2 relies on a Gradle internal API removed in Gradle 9.6. Do not accept this wrapper major update alone; upgrade AGP and Gradle together only after a coordinated compatibility migration.
+- Dependabot's AGP 9.5.2 PR failed during dependency resolution because Maven Central returned HTTP 429 (rate limiting), so that run did not prove AGP compatibility. Keep the known-good toolchain until a clean, uncached coordinated test can validate it.
+- Dependabot is configured to ignore major Gradle-wrapper and AGP updates until a deliberate migration is ready. Minor/patch updates remain eligible for CI validation.

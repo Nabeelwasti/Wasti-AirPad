@@ -178,7 +178,7 @@ internal class WifiRemoteClient(
             val authMessage = if (validTrustedToken != null) {
                 "{\"type\":\"auth\",\"token\":\"$validTrustedToken\"}"
             } else {
-                "{\"type\":\"auth\",\"code\":\"$config.pairingCode\"}"
+                "{\"type\":\"auth\",\"code\":\"${config.pairingCode}\"}"
             }
             output.write(authMessage)
             output.write("\n")

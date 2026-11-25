@@ -126,8 +126,11 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
     }
 
     private fun acquireMulticastLockIfRequired() {
-        val requiresManualLock = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        val requiresManualLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             SdkExtensions.getExtensionVersion(Build.VERSION_CODES.TIRAMISU) < 7
+        } else {
+            true
+        }
         if (requiresManualLock && multicastLock == null) {
             multicastLock = wifiManager.createMulticastLock("WastiAirPadNsd").apply {
                 setReferenceCounted(false)

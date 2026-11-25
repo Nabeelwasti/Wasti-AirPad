@@ -61,6 +61,7 @@ internal class WifiRemoteClient(
     @Volatile private var reconnectAttempts = 0
     private var heartbeatTask: ScheduledFuture<*>? = null
     private var reconnectTask: ScheduledFuture<*>? = null
+    private var stableConnectionTask: ScheduledFuture<*>? = null
 
     /**
      * Gesture callbacks can arrive on the UI thread at high frequency. Never let
@@ -97,6 +98,8 @@ internal class WifiRemoteClient(
             if (closed) return
             connectionConfig = config
             reconnectAttempts = 0
+            stableConnectionTask?.cancel(false)
+            stableConnectionTask = null
             reconnectTask?.cancel(false)
             reconnectTask = null
         }
@@ -219,7 +222,18 @@ internal class WifiRemoteClient(
                 config.trustedToken = newlyIssuedToken
                 onPairingToken(newlyIssuedToken)
             }
-            reconnectAttempts = 0
+            stableConnectionTask?.cancel(false)
+            stableConnectionTask = try {
+                scheduler.schedule({
+                    synchronized(stateLock) {
+                        if (!closed && socket === connectedSocket && isConnected) {
+                            reconnectAttempts = 0
+                        }
+                    }
+                }, STABLE_CONNECTION_RESET_SECONDS, TimeUnit.SECONDS)
+            } catch (_: RejectedExecutionException) {
+                null
+            }
             connectedSocket.soTimeout = HEARTBEAT_TIMEOUT_MS
             reconnectTask?.cancel(false)
             reconnectTask = null
@@ -293,6 +307,8 @@ internal class WifiRemoteClient(
                 isConnected = false
                 heartbeatTask?.cancel(false)
                 heartbeatTask = null
+                stableConnectionTask?.cancel(false)
+                stableConnectionTask = null
                 true
             }
         }
@@ -363,6 +379,8 @@ internal class WifiRemoteClient(
             socket = null
             heartbeatTask?.cancel(false)
             heartbeatTask = null
+            stableConnectionTask?.cancel(false)
+            stableConnectionTask = null
             try { activeSocket?.close() } catch (_: Exception) { }
         }
     }
@@ -382,5 +400,6 @@ internal class WifiRemoteClient(
         private const val CONNECT_TIMEOUT_MS = 7_000
         private const val HEARTBEAT_INTERVAL_SECONDS = 10L
         private const val HEARTBEAT_TIMEOUT_MS = 30_000
+        private const val STABLE_CONNECTION_RESET_SECONDS = 60L
     }
 }

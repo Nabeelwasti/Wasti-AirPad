@@ -6,6 +6,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Handler
 import android.os.Looper
 import java.io.Closeable
+import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 
 internal data class WifiDiscoveredHost(
@@ -27,6 +28,9 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
         closeDiscovery()
         finished.set(false)
         val hosts = LinkedHashMap<String, WifiDiscoveredHost>()
+        val pending = ArrayDeque<NsdServiceInfo>()
+        val seen = HashSet<String>()
+        var resolving = false
 
         fun finish() {
             if (!finished.compareAndSet(false, true)) return
@@ -35,33 +39,55 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
             handler.post { onComplete(discovered) }
         }
 
+        lateinit var resolveNext: () -> Unit
+        resolveNext = {
+            if (!finished.get() && !resolving && pending.isNotEmpty()) {
+                val next = pending.removeFirst()
+                resolving = true
+                try {
+                    @Suppress("DEPRECATION")
+                    manager.resolveService(next, object : NsdManager.ResolveListener {
+                        override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) {
+                            resolving = false
+                            resolveNext()
+                        }
+
+                        override fun onServiceResolved(info: NsdServiceInfo) {
+                            val address = info.host?.hostAddress
+                            val fingerprint = info.getAttribute("fingerprint")
+                                ?.toString(Charsets.UTF_8)
+                            if (address != null && fingerprint != null &&
+                                fingerprint.matches(Regex("[0-9a-fA-F]{64}"))
+                            ) {
+                                synchronized(hosts) {
+                                    val key = address + ":" + info.port
+                                    hosts[key] = WifiDiscoveredHost(
+                                        name = info.serviceName,
+                                        address = address,
+                                        port = info.port,
+                                        fingerprint = fingerprint
+                                    )
+                                }
+                            }
+                            resolving = false
+                            resolveNext()
+                        }
+                    })
+                } catch (_: Exception) {
+                    resolving = false
+                    resolveNext()
+                }
+            }
+        }
+
         val discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) = Unit
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (!serviceInfo.serviceType.contains(SERVICE_TYPE_PREFIX)) return
-                try {
-                    @Suppress("DEPRECATION")
-                    manager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
-                        override fun onResolveFailed(info: NsdServiceInfo, errorCode: Int) = Unit
-
-                        override fun onServiceResolved(info: NsdServiceInfo) {
-                            val address = info.host?.hostAddress ?: return
-                            val fingerprint = info.getAttribute("fingerprint")
-                                ?.toString(Charsets.UTF_8) ?: return
-                            if (!fingerprint.matches(Regex("[0-9a-fA-F]{64}"))) return
-                            val key = address + ":" + info.port
-                            synchronized(hosts) {
-                                hosts[key] = WifiDiscoveredHost(
-                                    name = info.serviceName,
-                                    address = address,
-                                    port = info.port,
-                                    fingerprint = fingerprint
-                                )
-                            }
-                        }
-                    })
-                } catch (_: Exception) {
+                if (seen.add(serviceInfo.serviceName)) {
+                    pending.addLast(serviceInfo)
+                    resolveNext()
                 }
             }
 
@@ -69,6 +95,8 @@ internal class WifiHostDiscovery(context: Context) : Closeable {
                 synchronized(hosts) {
                     hosts.entries.removeAll { it.value.name == serviceInfo.serviceName }
                 }
+                pending.removeAll { it.serviceName == serviceInfo.serviceName }
+                seen.remove(serviceInfo.serviceName)
             }
 
             override fun onDiscoveryStopped(serviceType: String) = Unit
